@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Download, Lock, Unlock, Tag, FileText, File, X, Upload } from "lucide-react";
+import { Search, Download, Lock, Unlock, File, X, Upload } from "lucide-react";
 import { mockDocuments, mockMatters, mockUsers } from "../data/mockData";
 import { Document, DocumentType } from "../types";
 

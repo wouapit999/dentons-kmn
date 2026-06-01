@@ -1,6 +1,6 @@
-﻿import React from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
-import { Briefcase, Users, CheckSquare, TrendingUp, Clock, AlertCircle, ArrowUpRight, ArrowDownRight, Plus } from "lucide-react";
+import { Briefcase, Users, CheckSquare, TrendingUp, Clock, AlertCircle, ArrowUpRight, Plus } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { mockMatters, mockClients, mockTasks, mockInvoices, mockTimeEntries, mockCalendarEvents, mockUsers } from "../data/mockData";
 

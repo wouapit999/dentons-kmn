@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Eye, Edit2, X, Building, User, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Search, Eye, Edit2, X, CheckCircle, XCircle } from "lucide-react";
 import { mockClients, mockMatters, mockInvoices } from "../data/mockData";
 import { Client, ClientType } from "../types";
 
@@ -26,8 +26,6 @@ export default function Clients() {
   const clientMatters = (id: string) => mockMatters.filter(m => m.clientId === id);
   const clientInvoices = (id: string) => mockInvoices.filter(i => i.clientId === id);
   const clientRevenue = (id: string) => clientInvoices(id).reduce((s, i) => s + i.amountPaid, 0);
-
-  const typeIcon = (type: string) => type === "individual" ? <User size={14} /> : <Building size={14} />;
   const typeBadge = (type: string) => {
     const map: Record<string, string> = { individual: "badge-purple", company: "badge-blue", government: "badge-yellow", ngo: "badge-green" };
     return <span className={`badge ${map[type] || "badge-gray"}`}>{t(`clients.clientTypes.${type}`)}</span>;

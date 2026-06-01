@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Menu, Bell, Search, LogOut, ChevronDown } from "lucide-react";
+import { Menu, Bell, LogOut, ChevronDown } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 interface HeaderProps {

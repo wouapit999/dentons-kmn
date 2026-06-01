@@ -1,4 +1,4 @@
-﻿import {
+import {
   User, Client, Matter, Document, Task, TimeEntry,
   Invoice, TrustAccount, TrustTransaction, AuditLog, CalendarEvent, Notification
 } from "../types";

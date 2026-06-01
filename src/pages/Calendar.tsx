@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
-import { mockCalendarEvents, mockMatters, mockUsers } from "../data/mockData";
+import { mockCalendarEvents, mockMatters } from "../data/mockData";
 import { CalendarEvent } from "../types";
 
 const MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -18,7 +18,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
   const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1)); // June 2026
   const [showModal, setShowModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [, setSelectedDate] = useState<Date | null>(null);
   const [form, setForm] = useState<Partial<CalendarEvent>>({ type: "meeting", attendees: [] });
 
   const year = currentDate.getFullYear();

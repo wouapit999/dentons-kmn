@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Eye, Edit2, Trash2, X, Users, Clock, FileText } from "lucide-react";
+import { Plus, Search, Eye, Edit2, X } from "lucide-react";
 import { mockMatters, mockClients, mockUsers, mockTasks, mockTimeEntries, mockDocuments } from "../data/mockData";
 import { Matter, MatterStatus, PracticeArea } from "../types";
 

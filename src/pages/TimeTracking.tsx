@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Play, Square, Check, X, Edit2 } from "lucide-react";
+import { Plus, Play, Square, Check, X } from "lucide-react";
 import { mockTimeEntries, mockMatters, mockUsers } from "../data/mockData";
 import { TimeEntry, TimeActivity } from "../types";
 
