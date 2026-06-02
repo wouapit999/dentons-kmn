@@ -1,89 +1,81 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { db, COLLECTIONS } from "../config/firebase";
 import { User, Notification } from "../types";
-
-const ADMIN_USER: User = {
-  id: "u1",
-  firstName: "Administrator",
-  lastName: "",
-  email: "rwouapit@bouquet-innovation.net",
-  role: "admin",
-  department: "Administration",
-  billingRate: 0,
-  joinDate: "2026-06-01",
-  active: true,
-};
-
-const STORAGE_KEY = "dentons_kmn_users";
-
-function loadUsers(): User[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed: User[] = JSON.parse(raw);
-      // Always ensure admin exists
-      if (!parsed.find(u => u.id === "u1")) parsed.unshift(ADMIN_USER);
-      return parsed;
-    }
-  } catch {}
-  return [ADMIN_USER];
-}
-
-function saveUsers(users: User[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-  } catch {}
-}
+import { clearSession } from "../services/authService";
+import type { Session } from "../services/authService";
 
 interface AppContextType {
   currentUser: User;
+  session: Session;
   users: User[];
-  setUsers: (users: User[] | ((prev: User[]) => User[])) => void;
+  setUsers: (v: User[] | ((p: User[]) => User[])) => void;
   notifications: Notification[];
   sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
+  setSidebarOpen: (v: boolean) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser] = useState<User>(ADMIN_USER);
-  const [users, setUsersState] = useState<User[]>(loadUsers);
+export const AppProvider = ({ children, session }: { children: ReactNode; session: Session }) => {
+  const [users, setUsersState]         = useState<User[]>([]);
+  const [currentUser, setCurrentUser]  = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen]  = useState(true);
 
-  // Persist users to localStorage on every change
+  // Real-time users listener
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, COLLECTIONS.USERS), snap => {
+      const list: User[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
+      setUsersState(list);
+      const me = list.find(u => u.id === session.userId);
+      if (me) setCurrentUser(me);
+    });
+    return unsub;
+  }, [session.userId]);
+
   const setUsers = (value: User[] | ((prev: User[]) => User[])) => {
     setUsersState(prev => {
       const next = typeof value === "function" ? value(prev) : value;
-      saveUsers(next);
+      // Persist to Firestore
+      next.forEach(u => {
+        const { id, ...data } = u;
+        updateDoc(doc(db, COLLECTIONS.USERS, id), data).catch(() => {});
+      });
       return next;
     });
   };
 
-  // Sync from localStorage if another tab changes it
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        try { setUsersState(JSON.parse(e.newValue)); } catch {}
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
-
   const markNotificationRead = (id: string) =>
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications(prev => prev.map(n => n.id===id ? {...n,read:true} : n));
 
   const markAllNotificationsRead = () =>
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => prev.map(n => ({...n,read:true})));
+
+  const logout = () => {
+    clearSession();
+    window.location.reload();
+  };
 
   return (
     <AppContext.Provider value={{
-      currentUser, users, setUsers,
-      notifications, sidebarOpen, setSidebarOpen,
-      markNotificationRead, markAllNotificationsRead,
+      currentUser: currentUser || {
+        id: session.userId, firstName: session.name.split(" ")[0], lastName: session.name.split(" ").slice(1).join(" "),
+        email: session.email, role: session.role, billingRate: 0,
+        joinDate: "", active: true,
+      } as User,
+      session,
+      users,
+      setUsers,
+      notifications,
+      sidebarOpen,
+      setSidebarOpen,
+      markNotificationRead,
+      markAllNotificationsRead,
+      logout,
     }}>
       {children}
     </AppContext.Provider>

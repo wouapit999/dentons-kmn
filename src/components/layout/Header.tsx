@@ -11,7 +11,8 @@ interface HeaderProps {
 
 export default function Header({ pageTitle, onToggleSidebar, onLogout }: HeaderProps) {
   const { t, i18n } = useTranslation();
-  const { currentUser, notifications, markAllNotificationsRead } = useApp();
+  const { currentUser: _cu, session, notifications, markAllNotificationsRead } = useApp();
+  const currentUser = _cu || { firstName: session?.name?.split(" ")[0]||"U", lastName: session?.name?.split(" ").slice(1).join(" ")||"", email: session?.email||"", role: session?.role||"associate" };
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const unread = notifications.filter(n => !n.read).length;

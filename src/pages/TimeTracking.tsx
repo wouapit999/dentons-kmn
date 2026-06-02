@@ -17,7 +17,7 @@ export default function TimeTracking() {
   const [form, setForm] = useState<Partial<TimeEntry>>({
     date: new Date().toISOString().split("T")[0],
     billable: true, hours: 1, activity: "drafting",
-    billingRate: currentUser.billingRate || 45000,
+    billingRate: currentUser?.billingRate || 45000,
   });
   const [errors, setErrors] = useState<Record<string,string>>({});
 
@@ -46,14 +46,14 @@ export default function TimeTracking() {
   const handleSubmit = () => {
     if (!validate()) return;
     setTimeEntries(prev => [{
-      id:`te${Date.now()}`, matterId:form.matterId!, userId:currentUser.id,
+      id:`te${Date.now()}`, matterId:form.matterId!, userId:currentUser?.id||"u1",
       date:form.date||new Date().toISOString().split("T")[0],
       hours:form.hours!, activity:(form.activity||"drafting") as TimeActivity,
       description:form.description||"", billable:form.billable!==false,
       billed:false, approved:false, billingRate:form.billingRate||45000,
     }, ...prev]);
     setShowModal(false);
-    setForm({ date:new Date().toISOString().split("T")[0], billable:true, hours:1, activity:"drafting", billingRate:currentUser.billingRate||45000 });
+    setForm({ date:new Date().toISOString().split("T")[0], billable:true, hours:1, activity:"drafting", billingRate:currentUser?.billingRate||45000 });
     setErrors({});
   };
 

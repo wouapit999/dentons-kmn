@@ -34,7 +34,7 @@ export default function Documents() {
 
   const handleCheckout = (id: string) => {
     setDocuments(prev => prev.map(d => d.id===id
-      ? { ...d, checkedOutBy:d.checkedOutBy?undefined:currentUser.id, checkedOutAt:d.checkedOutBy?undefined:new Date().toISOString() }
+      ? { ...d, checkedOutBy:d.checkedOutBy?undefined:(currentUser?.id||"u1"), checkedOutAt:d.checkedOutBy?undefined:new Date().toISOString() }
       : d
     ));
   };
@@ -52,7 +52,7 @@ export default function Documents() {
       fileName:form.fileName!, fileSize:1024000,
       fileType:form.fileName!.split(".").pop()||"other",
       documentType:(form.documentType||"other") as DocumentType,
-      version:1, uploadedBy:currentUser.id, uploadedAt:new Date().toISOString(),
+      version:1, uploadedBy:currentUser?.id||"u1", uploadedAt:new Date().toISOString(),
       tags:[], signed:false, description:form.description,
     }, ...prev]);
     setShowModal(false);
