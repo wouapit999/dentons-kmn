@@ -16,11 +16,12 @@ export default function Login({ onLogin }: LoginProps) {
   const [showPwd, setShowPwd]     = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
-  const [seeding, setSeeding]     = useState(true);
-
-  // Seed users on first load
+  // Seed users silently in background — never blocks the form
   useEffect(() => {
-    seedUsersIfNeeded().finally(() => setSeeding(false));
+    const timer = setTimeout(() => {
+      seedUsersIfNeeded().catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async () => {
@@ -56,12 +57,6 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
           </div>
 
-          {seeding && (
-            <div className="alert alert-info" style={{marginBottom:16}}>
-              <RefreshCw size={15} style={{animation:"spin 1s linear infinite",flexShrink:0}}/>
-              <span>Initialising system...</span>
-            </div>
-          )}
 
           {error && (
             <div className="alert alert-danger" style={{marginBottom:16}}>
@@ -83,7 +78,7 @@ export default function Login({ onLogin }: LoginProps) {
                 onChange={e=>{setEmail(e.target.value);setError("");}}
                 onKeyDown={e=>e.key==="Enter"&&handleSubmit()}
                 autoFocus
-                disabled={loading||seeding}
+                disabled={loading}
               />
             </div>
           </div>
@@ -100,7 +95,7 @@ export default function Login({ onLogin }: LoginProps) {
                 placeholder="••••••••"
                 onChange={e=>{setPassword(e.target.value);setError("");}}
                 onKeyDown={e=>e.key==="Enter"&&handleSubmit()}
-                disabled={loading||seeding}
+                disabled={loading}
               />
               <button
                 onClick={()=>setShowPwd(!showPwd)}
@@ -114,7 +109,7 @@ export default function Login({ onLogin }: LoginProps) {
           <button
             className="btn btn-gold btn-lg"
             onClick={handleSubmit}
-            disabled={loading||seeding||!email||!password}
+            disabled={loading||!email||!password}
             style={{width:"100%",justifyContent:"center",marginTop:8}}
           >
             {loading
