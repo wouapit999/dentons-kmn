@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import "./i18n";
 import "./index.css";
 import { AppProvider, useApp } from "./context/AppContext";
+import { DataProvider } from "./context/DataContext";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
 import Login from "./pages/Login";
@@ -22,18 +23,18 @@ import Trust from "./pages/Trust";
 
 const pageTitles: Record<string, string> = {
   dashboard: "nav.dashboard",
-  matters: "nav.matters",
-  clients: "nav.clients",
+  matters:   "nav.matters",
+  clients:   "nav.clients",
   documents: "nav.documents",
-  tasks: "nav.tasks",
-  calendar: "nav.calendar",
-  time: "nav.timeTracking",
-  billing: "nav.billing",
-  reports: "nav.reports",
-  settings: "nav.settings",
-  users: "nav.users",
-  audit: "nav.auditLog",
-  trust: "trust.title",
+  tasks:     "nav.tasks",
+  calendar:  "nav.calendar",
+  time:      "nav.timeTracking",
+  billing:   "nav.billing",
+  reports:   "nav.reports",
+  settings:  "nav.settings",
+  users:     "nav.users",
+  audit:     "nav.auditLog",
+  trust:     "trust.title",
 };
 
 function AppInner({ onLogout }: { onLogout: () => void }) {
@@ -69,24 +70,34 @@ function AppInner({ onLogout }: { onLogout: () => void }) {
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onLogout={onLogout}
         />
-        <div className="page-content">
-          {renderPage()}
-        </div>
+        <div className="page-content">{renderPage()}</div>
       </div>
     </div>
   );
 }
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => localStorage.getItem("dkmn_auth") === "true"
+  );
 
-  if (!isAuthenticated) {
-    return <Login onLogin={() => setIsAuthenticated(true)} />;
-  }
+  const handleLogin = () => {
+    localStorage.setItem("dkmn_auth", "true");
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("dkmn_auth");
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) return <Login onLogin={handleLogin} />;
 
   return (
     <AppProvider>
-      <AppInner onLogout={() => setIsAuthenticated(false)} />
+      <DataProvider>
+        <AppInner onLogout={handleLogout} />
+      </DataProvider>
     </AppProvider>
   );
 }
