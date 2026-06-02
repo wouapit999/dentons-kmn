@@ -1,45 +1,23 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Edit2, UserX, X, Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { Edit2, UserX, X, Mail, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { User, UserRole } from "../types";
 import { useApp } from "../context/AppContext";
-import EMAILJS_CONFIG from "../config/emailjs";
+import { sendInviteEmail } from "../config/emailjs";
 
-const fmt = (n: number) => n > 0 ? new Intl.NumberFormat("fr-CM", { style: "currency", currency: "XAF", maximumFractionDigits: 0 }).format(n) : "—";
+const fmt = (n: number) => n > 0
+  ? new Intl.NumberFormat("fr-CM", { style: "currency", currency: "XAF", maximumFractionDigits: 0 }).format(n)
+  : "—";
 
 const roleColor: Record<string, string> = {
   managingPartner: "badge-gold",
-  partner: "badge-navy",
-  associate: "badge-purple",
-  paralegal: "badge-green",
-  finance: "badge-yellow",
-  admin: "badge-red",
-  client: "badge-gray",
+  partner:         "badge-navy",
+  associate:       "badge-purple",
+  paralegal:       "badge-green",
+  finance:         "badge-yellow",
+  admin:           "badge-red",
+  client:          "badge-gray",
 };
-
-async function sendInvitationEmail(user: Partial<User>, tempPassword: string): Promise<boolean> {
-  try {
-    const { send } = await import("emailjs-com");
-    await send(
-      EMAILJS_CONFIG.serviceId,
-      EMAILJS_CONFIG.inviteTemplateId,
-      {
-        to_email: user.email,
-        to_name: `${user.firstName} ${user.lastName}`,
-        role: user.role,
-        firm_name: "Dentons KMN",
-        temp_password: tempPassword,
-        login_url: window.location.origin,
-        website: "dentons.com/en/global-presence/africa/cameroon/douala",
-        invited_by: "Administrator",
-      },
-      EMAILJS_CONFIG.publicKey
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#";
@@ -49,10 +27,10 @@ function generateTempPassword(): string {
 export default function Users() {
   const { t } = useTranslation();
   const { users, setUsers } = useApp();
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<User | null>(null);
-  const [form, setForm] = useState<Partial<User>>({ role: "associate", active: true, billingRate: 0 });
-  const [inviteStatus, setInviteStatus] = useState<{ type: "success" | "error" | "sending"; msg: string } | null>(null);
+  const [showModal, setShowModal]   = useState(false);
+  const [editing, setEditing]       = useState<User | null>(null);
+  const [form, setForm]             = useState<Partial<User>>({ role: "associate", active: true, billingRate: 0 });
+  const [inviteStatus, setInviteStatus] = useState<{ type: "success"|"error"|"sending"; msg: string } | null>(null);
 
   const handleSubmit = async () => {
     if (!form.firstName || !form.email) return;
@@ -67,38 +45,46 @@ export default function Users() {
 
     const tempPassword = generateTempPassword();
     const newUser: User = {
-      id: `u${Date.now()}`,
-      firstName: form.firstName!,
-      lastName: form.lastName || "",
-      email: form.email!,
-      role: form.role as UserRole || "associate",
+      id:          `u${Date.now()}`,
+      firstName:   form.firstName!,
+      lastName:    form.lastName || "",
+      email:       form.email!,
+      role:        (form.role as UserRole) || "associate",
       billingRate: form.billingRate || 0,
-      joinDate: new Date().toISOString().split("T")[0],
-      active: true,
-      department: form.department,
+      joinDate:    new Date().toISOString().split("T")[0],
+      active:      true,
+      department:  form.department,
     };
 
+    // Save user to persistent storage immediately
     setUsers(prev => [...prev, newUser]);
     setShowModal(false);
+    setForm({ role: "associate", active: true, billingRate: 0 });
+    setEditing(null);
 
     // Send invitation email
     setInviteStatus({ type: "sending", msg: `Sending invitation to ${form.email}...` });
-    const sent = await sendInvitationEmail(form, tempPassword);
+    const sent = await sendInviteEmail(
+      form.email!,
+      `${form.firstName} ${form.lastName || ""}`.trim(),
+      t(`users.roles.${form.role || "associate"}`),
+      tempPassword
+    );
 
     if (sent) {
-      setInviteStatus({ type: "success", msg: `Invitation sent to ${form.email} with temporary credentials.` });
+      setInviteStatus({ type: "success", msg: `Invitation sent to ${form.email}. They will receive their login credentials by email.` });
     } else {
       setInviteStatus({
         type: "error",
-        msg: `User created. Email not sent (EmailJS not configured). Share these credentials manually — Temp password: ${tempPassword}`,
+        msg: `User created and saved. Email could not be sent — share credentials manually: ${form.email} / Temp password: ${tempPassword}`,
       });
     }
-    setTimeout(() => setInviteStatus(null), 8000);
-    setForm({ role: "associate", active: true, billingRate: 0 });
-    setEditing(null);
+    setTimeout(() => setInviteStatus(null), 10000);
   };
 
-  const toggleActive = (id: string) => setUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u));
+  const toggleActive = (id: string) =>
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u));
+
   const openEdit = (u: User) => { setEditing(u); setForm(u); setShowModal(true); };
 
   return (
@@ -106,7 +92,9 @@ export default function Users() {
       <div className="page-header">
         <div>
           <div className="page-header-title">{t("users.title")}</div>
-          <div className="page-header-subtitle">{users.filter(u => u.active).length} {t("common.active").toLowerCase()} · {users.length} total</div>
+          <div className="page-header-subtitle">
+            {users.filter(u => u.active).length} {t("common.active").toLowerCase()} · {users.length} total
+          </div>
         </div>
         <button className="btn btn-gold" onClick={() => { setEditing(null); setForm({ role: "associate", active: true, billingRate: 0 }); setShowModal(true); }}>
           <Mail size={15} />{t("users.invite")}
@@ -116,7 +104,11 @@ export default function Users() {
       {/* Invite status alert */}
       {inviteStatus && (
         <div className={`alert alert-${inviteStatus.type === "success" ? "success" : inviteStatus.type === "error" ? "danger" : "info"}`} style={{ marginBottom: 20 }}>
-          {inviteStatus.type === "success" ? <CheckCircle size={16} style={{ flexShrink: 0 }} /> : <AlertCircle size={16} style={{ flexShrink: 0 }} />}
+          {inviteStatus.type === "sending"
+            ? <RefreshCw size={16} style={{ flexShrink: 0, animation: "spin 1s linear infinite" }} />
+            : inviteStatus.type === "success"
+            ? <CheckCircle size={16} style={{ flexShrink: 0 }} />
+            : <AlertCircle size={16} style={{ flexShrink: 0 }} />}
           <span>{inviteStatus.msg}</span>
         </div>
       )}
@@ -150,7 +142,7 @@ export default function Users() {
                     </div>
                   </td>
                   <td style={{ fontSize: 13, color: "var(--gray-600)" }}>{u.email}</td>
-                  <td><span className={`badge ${roleColor[u.role]}`}>{t(`users.roles.${u.role}`)}</span></td>
+                  <td><span className={`badge ${roleColor[u.role] || "badge-gray"}`}>{t(`users.roles.${u.role}`)}</span></td>
                   <td style={{ fontSize: 13 }}>{u.department || "—"}</td>
                   <td style={{ fontSize: 13, fontWeight: 500 }}>{fmt(u.billingRate)}{u.billingRate > 0 ? "/h" : ""}</td>
                   <td style={{ fontSize: 12, color: "var(--gray-500)" }}>{u.joinDate}</td>
@@ -161,13 +153,9 @@ export default function Users() {
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn btn-outline btn-sm btn-icon" onClick={() => openEdit(u)} title={t("common.edit")}>
-                        <Edit2 size={13} />
-                      </button>
+                      <button className="btn btn-outline btn-sm btn-icon" onClick={() => openEdit(u)} title={t("common.edit")}><Edit2 size={13} /></button>
                       {u.role !== "admin" && (
-                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => toggleActive(u.id)} title={t("users.deactivate")}>
-                          <UserX size={13} />
-                        </button>
+                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => toggleActive(u.id)} title={t("users.deactivate")}><UserX size={13} /></button>
                       )}
                     </div>
                   </td>
@@ -197,16 +185,16 @@ export default function Users() {
             </thead>
             <tbody>
               {[
-                [t("nav.matters"),       ["✓","✓","✓","◐","✗","✓"]],
-                [t("nav.clients"),       ["✓","✓","✓","◐","✗","✓"]],
-                [t("nav.documents"),     ["✓","✓","✓","✓","✗","✓"]],
-                [t("nav.tasks"),         ["✓","✓","✓","✓","✗","✓"]],
-                [t("nav.timeTracking"),  ["✓","✓","✓","✓","✓","✓"]],
-                [t("nav.billing"),       ["✓","✓","✗","✗","✓","✓"]],
-                [t("trust.title"),       ["✓","◐","✗","✗","✓","✓"]],
-                [t("nav.reports"),       ["✓","✓","◐","✗","✓","✓"]],
-                [t("nav.users"),         ["✓","✗","✗","✗","✗","✓"]],
-                [t("nav.settings"),      ["✓","✗","✗","✗","✗","✓"]],
+                [t("nav.matters"),      ["✓","✓","✓","◐","✗","✓"]],
+                [t("nav.clients"),      ["✓","✓","✓","◐","✗","✓"]],
+                [t("nav.documents"),    ["✓","✓","✓","✓","✗","✓"]],
+                [t("nav.tasks"),        ["✓","✓","✓","✓","✗","✓"]],
+                [t("nav.timeTracking"), ["✓","✓","✓","✓","✓","✓"]],
+                [t("nav.billing"),      ["✓","✓","✗","✗","✓","✓"]],
+                [t("trust.title"),      ["✓","◐","✗","✗","✓","✓"]],
+                [t("nav.reports"),      ["✓","✓","◐","✗","✓","✓"]],
+                [t("nav.users"),        ["✓","✗","✗","✗","✗","✓"]],
+                [t("nav.settings"),     ["✓","✗","✗","✗","✗","✓"]],
               ].map(([module, perms]) => (
                 <tr key={module as string}>
                   <td style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}>{module}</td>
@@ -235,7 +223,7 @@ export default function Users() {
               {!editing && (
                 <div className="alert alert-gold" style={{ marginBottom: 20 }}>
                   <Mail size={15} style={{ flexShrink: 0 }} />
-                  <span>An invitation email with login credentials will be sent automatically to the user's email address.</span>
+                  <span>An invitation email with temporary login credentials will be sent to this user automatically.</span>
                 </div>
               )}
               <div className="form-row">
@@ -250,7 +238,7 @@ export default function Users() {
               </div>
               <div className="form-group">
                 <label className="form-label required">{t("common.email")}</label>
-                <input className="form-control" type="email" value={form.email || ""} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@dentons-kmn.cm" />
+                <input className="form-control" type="email" value={form.email || ""} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@dentons-kmn.cm" />
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -273,17 +261,14 @@ export default function Users() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-outline" onClick={() => setShowModal(false)}>{t("common.cancel")}</button>
-              <button
-                className="btn btn-gold"
-                onClick={handleSubmit}
-                disabled={!form.firstName || !form.email}
-              >
-                {editing ? <><CheckCircle size={15} />{t("common.save")}</> : <><Mail size={15} />Send Invitation</>}
+              <button className="btn btn-gold" onClick={handleSubmit} disabled={!form.firstName || !form.email}>
+                {editing ? <><CheckCircle size={15} />{t("common.save")}</> : <><Mail size={15} />Create & Send Invitation</>}
               </button>
             </div>
           </div>
         </div>
       )}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

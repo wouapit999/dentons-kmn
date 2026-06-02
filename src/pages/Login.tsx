@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Mail, Shield, ArrowRight, RefreshCw, CheckCircle } from "lucide-react";
 import Logo from "../components/ui/Logo";
-import EMAILJS_CONFIG from "../config/emailjs";
+import { sendOtpEmail } from "../config/emailjs";
 
 const ADMIN_EMAIL = "rwouapit@bouquet-innovation.net";
 
@@ -22,53 +22,33 @@ export default function Login({ onLogin }: LoginProps) {
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [otpSentMsg, setOtpSentMsg] = useState(false);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (resendCooldown > 0) {
-      const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+      return () => clearTimeout(timer);
     }
   }, [resendCooldown]);
 
   const sendOtp = async () => {
     setError("");
     if (email.trim().toLowerCase() !== ADMIN_EMAIL) {
-      setError(t("auth.loginError"));
+      setError("Access denied. This email is not authorised.");
       return;
     }
     setLoading(true);
     const code = generateOTP();
     setGeneratedOtp(code);
 
-    // Send via EmailJS
-    try {
-      const { send } = await import("emailjs-com");
-      await send(
-        EMAILJS_CONFIG.serviceId,
-        EMAILJS_CONFIG.otpTemplateId,
-        {
-          to_email: email,
-          to_name: "Administrator",
-          otp_code: code,
-          firm_name: "Dentons KMN",
-          website: "dentons.com/en/global-presence/africa/cameroon/douala",
-        },
-        EMAILJS_CONFIG.publicKey
-      );
-    } catch (e) {
-      // EmailJS not configured — OTP shown below for demo
-    }
-
+    const sent = await sendOtpEmail(email.trim().toLowerCase(), code);
+    setEmailSent(sent);
     setLoading(false);
     setStep("otp");
     setResendCooldown(60);
-    setOtpSentMsg(true);
-    setTimeout(() => {
-      otpRefs.current[0]?.focus();
-    }, 100);
+    setTimeout(() => otpRefs.current[0]?.focus(), 100);
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -77,9 +57,7 @@ export default function Login({ onLogin }: LoginProps) {
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
     setError("");
-    if (value && index < 5) {
-      otpRefs.current[index + 1]?.focus();
-    }
+    if (value && index < 5) otpRefs.current[index + 1]?.focus();
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
@@ -99,22 +77,22 @@ export default function Login({ onLogin }: LoginProps) {
 
   const verifyOtp = () => {
     const entered = otp.join("");
-    if (entered.length < 6) { setError("Please enter all 6 digits"); return; }
+    if (entered.length < 6) { setError("Please enter all 6 digits."); return; }
     if (entered !== generatedOtp) {
-      setError("Invalid OTP code. Please try again.");
-      setOtp(["","","","","",""]);
+      setError("Incorrect code. Please try again.");
+      setOtp(["", "", "", "", "", ""]);
       otpRefs.current[0]?.focus();
       return;
     }
     setLoading(true);
-    setTimeout(() => { onLogin(); }, 800);
+    setTimeout(() => onLogin(), 600);
   };
 
-  const resendOtp = () => {
+  const resendOtp = async () => {
     if (resendCooldown > 0) return;
-    setOtp(["","","","","",""]);
+    setOtp(["", "", "", "", "", ""]);
     setError("");
-    sendOtp();
+    await sendOtp();
   };
 
   return (
@@ -131,7 +109,7 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="login-subtitle">
             {step === "email"
               ? "Legal Practice Management System"
-              : `A 6-digit code has been sent to your email`}
+              : `Code sent to ${email}`}
           </div>
         </div>
 
@@ -147,10 +125,9 @@ export default function Login({ onLogin }: LoginProps) {
 
           {step === "email" ? (
             <>
-              {/* Security notice */}
               <div className="alert alert-gold" style={{ marginBottom: 24 }}>
                 <Shield size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>Access is restricted to authorized personnel only. An OTP will be sent to your registered email.</span>
+                <span>Access is restricted to authorised personnel only. An OTP will be sent to your registered email address.</span>
               </div>
 
               <div className="form-group">
@@ -172,46 +149,44 @@ export default function Login({ onLogin }: LoginProps) {
               </div>
 
               <button
-                className="btn btn-gold btn-block btn-lg"
+                className="btn btn-gold btn-lg"
                 onClick={sendOtp}
                 disabled={loading || !email}
-                style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
+                style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
               >
                 {loading
                   ? <><RefreshCw size={16} style={{ animation: "spin 1s linear infinite" }} /> Sending OTP...</>
-                  : <>{t("auth.login")} <ArrowRight size={16} /></>
-                }
+                  : <>{t("auth.login")} <ArrowRight size={16} /></>}
               </button>
             </>
           ) : (
             <>
-              {/* OTP sent confirmation */}
-              {otpSentMsg && (
+              {emailSent ? (
                 <div className="alert alert-success" style={{ marginBottom: 20 }}>
                   <CheckCircle size={16} style={{ flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontWeight: 700 }}>OTP sent successfully</div>
-                    <div style={{ fontSize: 12, marginTop: 2 }}>Check your inbox at <strong>{email}</strong></div>
+                    <div style={{ fontWeight: 700 }}>OTP sent to your email</div>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>Check your inbox at <strong>{email}</strong>. Check spam if not received.</div>
                   </div>
                 </div>
-              )}
-
-              {/* Dev mode — show OTP */}
-              {generatedOtp && (
+              ) : (
                 <div className="alert alert-info" style={{ marginBottom: 20 }}>
                   <Shield size={16} style={{ flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Demo Mode — Your OTP</div>
-                    <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "0.2em", marginTop: 4, fontFamily: "monospace" }}>{generatedOtp}</div>
+                    <div style={{ fontWeight: 700 }}>Email delivery issue</div>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>Could not send email. Your demo OTP is shown below.</div>
                   </div>
                 </div>
               )}
 
-              <div style={{ textAlign: "center", marginBottom: 8 }}>
-                <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 6 }}>
-                  Enter the 6-digit code
-                </div>
+              {/* Always show OTP in demo/dev so admin can still log in */}
+              <div style={{ background: "var(--navy)", borderRadius: 10, padding: "16px 20px", marginBottom: 20, textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "rgba(201,168,76,0.8)", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Your One-Time Password</div>
+                <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: "0.3em", color: "#C9A84C", fontFamily: "monospace" }}>{generatedOtp}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>Valid for 10 minutes</div>
               </div>
+
+              <div style={{ textAlign: "center", fontSize: 13, color: "var(--gray-500)", marginBottom: 10 }}>Enter the 6-digit code</div>
 
               <div className="otp-container" onPaste={handleOtpPaste}>
                 {otp.map((digit, i) => (
@@ -229,29 +204,21 @@ export default function Login({ onLogin }: LoginProps) {
                 ))}
               </div>
 
-              {error && (
-                <div style={{ textAlign: "center", marginBottom: 12 }}>
-                  <div className="form-error" style={{ display: "inline-block" }}>{error}</div>
-                </div>
-              )}
+              {error && <div style={{ textAlign: "center", marginBottom: 10 }}><div className="form-error" style={{ display: "inline-block" }}>{error}</div></div>}
 
               <button
-                className="btn btn-gold btn-block btn-lg"
+                className="btn btn-gold btn-lg"
                 onClick={verifyOtp}
                 disabled={loading || otp.join("").length < 6}
                 style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
               >
                 {loading
                   ? <><RefreshCw size={16} style={{ animation: "spin 1s linear infinite" }} /> Verifying...</>
-                  : <><Shield size={16} /> Verify & Sign In</>
-                }
+                  : <><Shield size={16} /> Verify & Sign In</>}
               </button>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => { setStep("email"); setOtp(["","","","","",""]); setError(""); }}
-                >
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setStep("email"); setOtp(["","","","","",""]); setError(""); }}>
                   ← Change email
                 </button>
                 <button
@@ -266,10 +233,9 @@ export default function Login({ onLogin }: LoginProps) {
             </>
           )}
 
-          {/* Footer */}
           <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--gray-200)", textAlign: "center" }}>
             <div style={{ fontSize: 11, color: "var(--gray-400)", lineHeight: 1.8 }}>
-              <div style={{ fontWeight: 600, color: "var(--gray-600)", marginBottom: 4 }}>Dentons KMN — Kouengoua Minou Nkongho Law Firm</div>
+              <div style={{ fontWeight: 600, color: "var(--gray-600)", marginBottom: 2 }}>Dentons KMN — Kouengoua Minou Nkongho</div>
               <div>Douala, Cameroun</div>
               <a href="https://www.dentons.com/en/global-presence/africa/cameroon/douala" target="_blank" rel="noopener noreferrer" style={{ color: "var(--gold-dark)", textDecoration: "none", fontWeight: 600 }}>
                 dentons.com/en/global-presence/africa/cameroon/douala
@@ -278,10 +244,7 @@ export default function Login({ onLogin }: LoginProps) {
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
