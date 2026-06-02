@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from "recharts";
 import { mockMatters, mockInvoices, mockTimeEntries, mockUsers, mockClients } from "../data/mockData";
+import Logo from "../components/ui/Logo";
 
 const fmt = (n: number) => new Intl.NumberFormat("fr-CM", { style: "currency", currency: "XAF", maximumFractionDigits: 0 }).format(n);
 const COLORS = ["#1a3a5c","#c9a84c","#38a169","#e53e3e","#3182ce","#805ad5","#d69e2e"];
@@ -45,6 +46,19 @@ export default function Reports() {
 
   return (
     <div>
+      {/* Report logo header — appears on all reports */}
+      <div className="report-logo-header">
+        <Logo size="md" variant="dark" showTagline />
+        <div className="report-firm-info">
+          <div className="report-firm-name">Dentons KMN</div>
+          <div>Kouengoua · Minou · Nkongho Law Firm</div>
+          <div>Douala, Cameroun</div>
+          <a href="https://www.dentons.com/en/global-presence/africa/cameroon/douala" target="_blank" rel="noopener noreferrer" style={{ color: "var(--gold-dark)", textDecoration: "none", fontWeight: 600 }}>
+            dentons.com/en/global-presence/africa/cameroon/douala
+          </a>
+        </div>
+      </div>
+
       <div className="page-header">
         <div className="page-header-title">{t("reports.title")}</div>
         <div style={{ display: "flex", gap: 10 }}>

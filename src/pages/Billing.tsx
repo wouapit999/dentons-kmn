@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Eye, Send, CheckCircle, X, AlertCircle } from "lucide-react";
+import Logo from "../components/ui/Logo";
 import { mockInvoices, mockClients, mockMatters } from "../data/mockData";
 import { Invoice, InvoiceStatus } from "../types";
 
@@ -66,10 +67,12 @@ export default function Billing() {
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 32 }}>
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)" }}>DENTONS KMN</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 4 }}>Kouengoua Minou Nkongho Law Firm</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>Douala, Cameroun</div>
+                    <Logo size="md" variant="dark" showTagline />
+                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 10 }}>Douala, Cameroun</div>
                     <div style={{ fontSize: 12, color: "var(--gray-500)" }}>cabinet@dentons-kmn.cm</div>
+                    <a href="https://www.dentons.com/en/global-presence/africa/cameroon/douala" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--gold-dark)", textDecoration: "none" }}>
+                      dentons.com · Africa/Cameroon/Douala
+                    </a>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 28, fontWeight: 700, color: "var(--primary)" }}>FACTURE</div>

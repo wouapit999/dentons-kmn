@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Edit2, UserX, X, Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { Edit2, UserX, X, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { User, UserRole } from "../types";
 import { useApp } from "../context/AppContext";
 import EMAILJS_CONFIG from "../config/emailjs";

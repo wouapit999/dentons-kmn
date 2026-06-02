@@ -5,6 +5,7 @@ import {
   Calendar, Clock, Receipt, BarChart2, Settings, UserCog,
   Shield, Scale
 } from "lucide-react";
+import Logo from "../ui/Logo";
 
 interface SidebarProps {
   activePage: string;
@@ -28,38 +29,25 @@ const navItems = [
   { key: "settings", icon: Settings, label: "nav.settings", section: "manage" },
 ];
 
-const sectionLabels: Record<string, string> = {
-  core: "LEGAL WORK",
-  billing: "FINANCE",
-  manage: "ADMINISTRATION",
-};
-
-const sectionLabelsFr: Record<string, string> = {
-  core: "PRATIQUE JURIDIQUE",
-  billing: "FINANCES",
-  manage: "ADMINISTRATION",
-};
+const sectionLabelsEn: Record<string, string> = { core: "Legal Practice", billing: "Finance", manage: "Administration" };
+const sectionLabelsFr: Record<string, string> = { core: "Pratique Juridique", billing: "Finances", manage: "Administration" };
 
 export default function Sidebar({ activePage, onNavigate, collapsed }: SidebarProps) {
   const { t, i18n } = useTranslation();
-  const isFr = i18n.language === "fr";
-  const labels = isFr ? sectionLabelsFr : sectionLabels;
-
+  const labels = i18n.language === "fr" ? sectionLabelsFr : sectionLabelsEn;
   let lastSection: string | null = undefined as any;
 
   return (
     <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      {/* Logo */}
       <div className="sidebar-logo">
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: "#c9a84c", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Scale size={20} color="white" />
-        </div>
-        {!collapsed && (
-          <div>
-            <div className="sidebar-logo-text">Dentons KMN</div>
-            <div className="sidebar-logo-sub">Legal Practice</div>
-          </div>
-        )}
+        {collapsed
+          ? <Scale size={24} color="var(--gold)" style={{ margin: "0 auto", display: "block" }} />
+          : <Logo size="sm" variant="light" showTagline />
+        }
       </div>
+
+      {/* Nav */}
       <nav className="sidebar-nav">
         {navItems.map((item) => {
           const showSection = item.section !== lastSection && item.section !== null;
@@ -82,11 +70,17 @@ export default function Sidebar({ activePage, onNavigate, collapsed }: SidebarPr
           );
         })}
       </nav>
-      <div style={{ padding: "12px 8px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+
+      {/* Footer */}
+      <div className="sidebar-footer">
         {!collapsed && (
-          <div style={{ padding: "8px 12px", fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
-            v1.0 – Dentons KMN © 2026
-          </div>
+          <a
+            href="https://www.dentons.com/en/global-presence/africa/cameroon/douala"
+            target="_blank" rel="noopener noreferrer"
+            style={{ display: "block", textAlign: "center", fontSize: 10, color: "rgba(201,168,76,0.5)", textDecoration: "none", letterSpacing: "0.05em", lineHeight: 1.6 }}
+          >
+            dentons.com<br />Douala, Cameroun
+          </a>
         )}
       </div>
     </div>

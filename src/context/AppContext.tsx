@@ -4,6 +4,8 @@ import { mockUsers, mockNotifications } from "../data/mockData";
 
 interface AppContextType {
   currentUser: User;
+  users: User[];
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   notifications: Notification[];
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -15,19 +17,18 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser] = useState<User>(mockUsers[0]);
+  const [users, setUsers] = useState<User[]>(mockUsers);
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const markNotificationRead = (id: string) => {
+  const markNotificationRead = (id: string) =>
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
 
-  const markAllNotificationsRead = () => {
+  const markAllNotificationsRead = () =>
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
 
   return (
-    <AppContext.Provider value={{ currentUser, notifications, sidebarOpen, setSidebarOpen, markNotificationRead, markAllNotificationsRead }}>
+    <AppContext.Provider value={{ currentUser, users, setUsers, notifications, sidebarOpen, setSidebarOpen, markNotificationRead, markAllNotificationsRead }}>
       {children}
     </AppContext.Provider>
   );
