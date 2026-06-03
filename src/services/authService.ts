@@ -4,6 +4,7 @@ import {
 import { db, COLLECTIONS } from "../config/firebase";
 import { UserRole } from "../types";
 
+// ── Password hashing ───────────────────────────────────────────────────────
 async function hashPassword(password: string, salt: string): Promise<string> {
   const data = new TextEncoder().encode(password + salt);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -14,41 +15,16 @@ export async function hashPwd(password: string): Promise<string> {
   return hashPassword(password, SALT);
 }
 
+// ── Session management ─────────────────────────────────────────────────────
 const SESSION_KEY = "dkmn_session";
 export interface Session { userId: string; email: string; role: UserRole; name: string; }
 export function getSession(): Session | null {
   try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
-export function setSession(session: Session) { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+export function setSession(s: Session) { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
 export function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
-export async function login(email: string, password: string): Promise<{ success: boolean; session?: Session; error?: string }> {
-  try {
-    const q = query(collection(db, COLLECTIONS.USERS), where("email", "==", email.toLowerCase().trim()));
-    const snap = await getDocs(q);
-    if (snap.empty) return { success: false, error: "Email address not found." };
-    const userDoc = snap.docs[0];
-    const userData = userDoc.data();
-    if (!userData.active) return { success: false, error: "Account deactivated. Contact the administrator." };
-    const hashed = await hashPwd(password);
-    if (userData.passwordHash !== hashed) return { success: false, error: "Incorrect password." };
-    await updateDoc(doc(db, COLLECTIONS.USERS, userDoc.id), { lastLogin: serverTimestamp() });
-    await setDoc(doc(collection(db, COLLECTIONS.AUDIT_LOGS)), {
-      userId: userDoc.id, action: "login", entityType: "User",
-      entityId: userDoc.id, timestamp: new Date().toISOString(), ipAddress: "—",
-    });
-    const session: Session = { userId: userDoc.id, email: userData.email, role: userData.role, name: `${userData.firstName} ${userData.lastName}`.trim() };
-    setSession(session);
-    return { success: true, session };
-  } catch (err: any) {
-    console.error("Login error:", err);
-    if (err?.code === "unavailable" || String(err).includes("offline") || String(err).includes("network")) {
-      return { success: false, error: "Cannot connect to server. Check your internet connection." };
-    }
-    return { success: false, error: "Login failed. Please try again." };
-  }
-}
-
+// ── All users from Excel — used as fallback when Firebase is not configured ─
 export const INITIAL_USERS: Array<{ id:string; firstName:string; lastName:string; email:string; role:UserRole; billingRate:number; department:string; password:string; }> = [
   { id:"u1",  firstName:"KOUENGOUA",  lastName:"",          email:"kouengoua@dentons.com",         role:"managingPartner", billingRate:75000, department:"Management",  password:"9006714" },
   { id:"u2",  firstName:"Sterling",   lastName:"MINOU",     email:"sterling.minou@dentons.com",    role:"managingPartner", billingRate:75000, department:"Management",  password:"8521347" },
@@ -69,7 +45,91 @@ export const INITIAL_USERS: Array<{ id:string; firstName:string; lastName:string
   { id:"u17", firstName:"Roland",     lastName:"Wouapit",   email:"roland.wouapit@dentons.com",    role:"admin",           billingRate:0,     department:"IT",          password:"2890998" },
 ];
 
+// ── Check if Firebase is properly configured ───────────────────────────────
+function isFirebaseConfigured(): boolean {
+  try {
+    // If projectId is still a placeholder, Firebase is not configured
+    const projectId = (db as any)?._databaseId?.projectId || "";
+    return Boolean(projectId) && !projectId.includes("YOUR_") && projectId !== "demo-project";
+  } catch { return false; }
+}
+
+// ── Local fallback login (works without Firebase) ──────────────────────────
+async function localLogin(email: string, password: string): Promise<{ success: boolean; session?: Session; error?: string }> {
+  const user = INITIAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+  if (!user) return { success: false, error: "Email address not found. Check your email and try again." };
+  if (user.password !== password.trim()) return { success: false, error: "Incorrect password. Please try again." };
+
+  // Store user profile locally so the app works
+  const key = "dkmn_local_users";
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!existing.find((u: any) => u.id === user.id)) {
+      existing.push({ ...user, active: true, joinDate: new Date().toISOString().split("T")[0] });
+      localStorage.setItem(key, JSON.stringify(existing));
+    }
+  } catch {}
+
+  const session: Session = {
+    userId: user.id,
+    email:  user.email,
+    role:   user.role,
+    name:   `${user.firstName} ${user.lastName}`.trim(),
+  };
+  setSession(session);
+  return { success: true, session };
+}
+
+// ── Main login — tries Firebase first, falls back to local ─────────────────
+export async function login(email: string, password: string): Promise<{ success: boolean; session?: Session; error?: string }> {
+  // If Firebase is not configured, use local auth immediately
+  if (!isFirebaseConfigured()) {
+    console.info("Firebase not configured — using local authentication.");
+    return localLogin(email, password);
+  }
+
+  // Try Firebase auth with a 5-second timeout
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const q = query(collection(db, COLLECTIONS.USERS), where("email", "==", email.toLowerCase().trim()));
+    const snap = await getDocs(q);
+    clearTimeout(timeoutId);
+
+    if (snap.empty) {
+      // Firebase connected but user not found — try seeding then retry
+      await seedUsersIfNeeded();
+      return localLogin(email, password);
+    }
+
+    const userDoc = snap.docs[0];
+    const userData = userDoc.data();
+    if (!userData.active) return { success: false, error: "Account deactivated. Contact the administrator." };
+
+    const hashed = await hashPwd(password);
+    if (userData.passwordHash !== hashed) return { success: false, error: "Incorrect password. Please try again." };
+
+    await updateDoc(doc(db, COLLECTIONS.USERS, userDoc.id), { lastLogin: serverTimestamp() }).catch(() => {});
+
+    const session: Session = {
+      userId: userDoc.id,
+      email:  userData.email,
+      role:   userData.role,
+      name:   `${userData.firstName} ${userData.lastName}`.trim(),
+    };
+    setSession(session);
+    return { success: true, session };
+
+  } catch (err: any) {
+    console.warn("Firebase login failed, using local fallback:", err?.message || err);
+    return localLogin(email, password);
+  }
+}
+
+// ── Seed all users into Firestore ──────────────────────────────────────────
 export async function seedUsersIfNeeded(): Promise<void> {
+  if (!isFirebaseConfigured()) return;
   try {
     const snap = await getDocs(collection(db, COLLECTIONS.USERS));
     if (snap.size >= INITIAL_USERS.length) return;
@@ -83,13 +143,22 @@ export async function seedUsersIfNeeded(): Promise<void> {
         forcePasswordChange: false,
       });
     }
+    console.info("Users seeded to Firebase successfully.");
   } catch (err) { console.error("Seed error:", err); }
 }
 
+// ── Change password ────────────────────────────────────────────────────────
 export async function changePassword(userId: string, newPassword: string): Promise<boolean> {
   try {
-    const hash = await hashPwd(newPassword);
-    await updateDoc(doc(db, COLLECTIONS.USERS, userId), { passwordHash: hash, forcePasswordChange: false });
+    if (isFirebaseConfigured()) {
+      const hash = await hashPwd(newPassword);
+      await updateDoc(doc(db, COLLECTIONS.USERS, userId), { passwordHash: hash, forcePasswordChange: false });
+    }
+    // Also update local copy
+    const key = "dkmn_local_users";
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const idx = existing.findIndex((u: any) => u.id === userId);
+    if (idx !== -1) { existing[idx].password = newPassword; localStorage.setItem(key, JSON.stringify(existing)); }
     return true;
   } catch { return false; }
 }

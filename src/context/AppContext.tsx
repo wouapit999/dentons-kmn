@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db, COLLECTIONS } from "../config/firebase";
 import { User, Notification } from "../types";
-import { clearSession } from "../services/authService";
+import { clearSession, INITIAL_USERS } from "../services/authService";
 import type { Session } from "../services/authService";
 
 interface AppContextType {
@@ -26,14 +26,30 @@ export const AppProvider = ({ children, session }: { children: ReactNode; sessio
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [sidebarOpen, setSidebarOpen]  = useState(true);
 
-  // Real-time users listener
+  // Load users — from Firebase if configured, otherwise from local list
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, COLLECTIONS.USERS), snap => {
-      const list: User[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
-      setUsersState(list);
-      const me = list.find(u => u.id === session.userId);
-      if (me) setCurrentUser(me);
-    });
+    // Always seed local users immediately so UI works without Firebase
+    const localList: User[] = INITIAL_USERS.map(u => ({
+      id: u.id, firstName: u.firstName, lastName: u.lastName,
+      email: u.email, role: u.role, billingRate: u.billingRate,
+      department: u.department, joinDate: "", active: true,
+    }));
+    setUsersState(localList);
+    const me = localList.find(u => u.id === session.userId);
+    if (me) setCurrentUser(me);
+
+    // Also subscribe to Firebase if configured
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, COLLECTIONS.USERS), snap => {
+        if (snap.docs.length > 0) {
+          const list: User[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
+          setUsersState(list);
+          const me2 = list.find(u => u.id === session.userId);
+          if (me2) setCurrentUser(me2);
+        }
+      }, () => {}); // silently ignore Firebase errors
+    } catch {}
     return unsub;
   }, [session.userId]);
 
