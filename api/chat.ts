@@ -123,16 +123,23 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { messages } = req.body;
+  const { messages, lang = "en" } = req.body;
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: "messages array required" });
   }
+
+  // Append a language instruction to the system prompt
+  const langInstruction = lang === "fr"
+    ? "\n\n## LANGUE DE RÉPONSE\nL'utilisateur a sélectionné le **français**. Vous DEVEZ répondre entièrement en français, quelle que soit la langue de la question. Tous vos messages, explications, listes et liens doivent être en français."
+    : "\n\n## RESPONSE LANGUAGE\nThe user has selected **English**. You MUST respond entirely in English regardless of what language the question is asked in.";
+
+  const systemWithLang = SYSTEM_PROMPT + langInstruction;
 
   try {
     const response = await client.messages.create({
       model:      "claude-opus-4-5",
       max_tokens: 1024,
-      system:     SYSTEM_PROMPT,
+      system:     systemWithLang,
       messages:   messages.map((m: any) => ({ role: m.role, content: m.content })),
     });
 
@@ -141,6 +148,9 @@ export default async function handler(req: any, res: any) {
 
   } catch (err: any) {
     console.error("Chat error:", err);
-    return res.status(500).json({ error: "AI service unavailable. Please try again." });
+    const errMsg = lang === "fr"
+      ? "Service IA indisponible. Veuillez réessayer."
+      : "AI service unavailable. Please try again.";
+    return res.status(500).json({ error: errMsg });
   }
 }
