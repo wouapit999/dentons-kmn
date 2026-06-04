@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyC5zm9WOA8cKB_voDJtWGJuXoj9u4V26vY",
@@ -16,8 +17,9 @@ const firebaseConfig = {
   appId:             "1:689398115566:web:c908e00b64b451802217ff",
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db  = getFirestore(app);
+export const app     = initializeApp(firebaseConfig);
+export const db      = getFirestore(app);
+export const storage = getStorage(app);
 
 // Enable offline persistence so the app keeps working briefly if network drops
 enableIndexedDbPersistence(db).catch(() => {/* multi-tab mode — ignore */});

@@ -120,6 +120,7 @@ export interface Document {
   tags: string[];
   description?: string;
   signed: boolean;
+  downloadUrl?: string;
 }
 
 export interface Task {
