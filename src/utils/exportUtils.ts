@@ -3,7 +3,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const FIRM = "Dentons KMN — Kouengoua Minou Nkongho Law Firm";
-const ADDR = "Douala, Cameroun | cabinet@dentons-kmn.cm";
+const ADDR = "Douala, Cameroun | kmn@dentons.com";
 const fmt  = (n: number) =>
   new Intl.NumberFormat("fr-CM", { style: "currency", currency: "XAF", maximumFractionDigits: 0 }).format(n);
 

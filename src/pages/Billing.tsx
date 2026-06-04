@@ -250,7 +250,7 @@ export default function Billing() {
               <div>
                 <Logo size="md" variant="dark" showTagline/>
                 <div style={{fontSize:12,color:"var(--gray-500)",marginTop:8}}>Douala, Cameroun</div>
-                <div style={{fontSize:12,color:"var(--gray-500)"}}>cabinet@dentons-kmn.cm</div>
+                <div style={{fontSize:12,color:"var(--gray-500)"}}>kmn@dentons.com</div>
                 <a href="https://www.dentons.com/en/global-presence/africa/cameroon/douala" style={{fontSize:11,color:"var(--gold-dark)",textDecoration:"none"}}>dentons.com</a>
               </div>
               <div style={{textAlign:"right"}}>

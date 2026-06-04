@@ -58,7 +58,7 @@ export default function Settings() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">{t("common.email")}</label>
-                    <input className="form-control" defaultValue="cabinet@dentons-kmn.cm" />
+                    <input className="form-control" defaultValue="kmn@dentons.com" />
                   </div>
                 </div>
                 <div className="form-group">
