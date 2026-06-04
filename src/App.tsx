@@ -18,6 +18,7 @@ import Billing from "./pages/Billing";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
+import ChatBot from "./components/ui/ChatBot";
 import AuditLog from "./pages/AuditLog";
 import Trust from "./pages/Trust";
 import { getSession } from "./services/authService";
@@ -100,6 +101,8 @@ function AppInner() {
         />
         <div className="page-content">{renderPage()}</div>
       </div>
+      {/* AI Legal Assistant — available to all logged-in users */}
+      <ChatBot/>
     </div>
   );
 }
