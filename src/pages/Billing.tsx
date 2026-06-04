@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus, Eye, Send, CheckCircle, X, AlertCircle,
-  FileText, CreditCard, Printer, TrendingUp
+  FileText, CreditCard, Printer, TrendingUp, Clock, Download
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -27,7 +27,7 @@ export default function Billing() {
   const { t } = useTranslation();
   const { currentUser, users } = useApp();
   const {
-    invoices, setInvoices, clients, matters, timeEntries,
+    invoices, setInvoices, clients, matters, timeEntries, setTimeEntries,
     payments, setPayments, expenses, setExpenses, retainers, setRetainers
   } = useData();
 
@@ -118,25 +118,41 @@ export default function Billing() {
     }));
 
   const handleCreateInvoice = () => {
+    // Validate
     const e: Record<string,string> = {};
     if (!invForm.clientId) e.clientId = t("errors.required");
     if (!invForm.matterId)  e.matterId  = t("errors.required");
     if (Object.keys(e).length) { setInvErrors(e); return; }
+
     const { subtotal, taxAmount, total } = calcTotals(lineItems, invForm.discount||0, invForm.taxRate||TAX_RATE);
-    const year = new Date().getFullYear();
-    setInvoices(prev => [{
-      id: `i${Date.now()}`,
-      invoiceNumber: `DK-INV-${year}-${String(prev.length + 1).padStart(3,"0")}`,
-      matterId: invForm.matterId!, clientId: invForm.clientId!,
-      invoiceDate: invForm.invoiceDate || new Date().toISOString().split("T")[0],
-      dueDate: invForm.dueDate || new Date(Date.now()+30*86400000).toISOString().split("T")[0],
-      lineItems, subtotal, taxRate: invForm.taxRate||TAX_RATE, taxAmount,
-      discount: invForm.discount||0, total, amountPaid: 0,
-      status: "draft" as InvoiceStatus,
-      paymentTerms: invForm.paymentTerms||"30 days",
-      notes: invForm.notes,
-      billingModel: invForm.billingModel||"hourly",
-    }, ...prev]);
+    const year    = new Date().getFullYear();
+    const invNum  = `DK-INV-${year}-${String(invoices.length + 1).padStart(3,"0")}`;
+    const newInv: Invoice = {
+      id:            `i${Date.now()}`,
+      invoiceNumber: invNum,
+      matterId:      invForm.matterId!,
+      clientId:      invForm.clientId!,
+      invoiceDate:   invForm.invoiceDate || new Date().toISOString().split("T")[0],
+      dueDate:       invForm.dueDate || new Date(Date.now()+30*86400000).toISOString().split("T")[0],
+      lineItems:     [...lineItems],
+      subtotal, taxRate: invForm.taxRate||TAX_RATE, taxAmount,
+      discount:      invForm.discount||0,
+      total,
+      amountPaid:    0,
+      status:        "draft" as InvoiceStatus,
+      paymentTerms:  invForm.paymentTerms||"30 days",
+      notes:         invForm.notes,
+      billingModel:  invForm.billingModel||"hourly",
+    };
+
+    // Mark imported time entries as billed
+    lineItems.filter(li => li.type === "time" && (li as any).timeEntryId).forEach(li => {
+      setTimeEntries(prev => prev.map(te =>
+        te.id === (li as any).timeEntryId ? { ...te, billed: true } : te
+      ));
+    });
+
+    setInvoices(prev => [newInv, ...prev]);
     setShowInvoiceModal(false);
     setInvForm({ status:"draft", taxRate:TAX_RATE, discount:0, amountPaid:0 });
     setLineItems([]); setInvErrors({});
@@ -746,13 +762,67 @@ export default function Billing() {
 
               {/* Line Items */}
               <div style={{marginBottom:16}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
                   <label className="form-label" style={{margin:0}}>{t("billing.lineItems")}</label>
-                  <button className="btn btn-outline btn-sm" onClick={addLineItem}><Plus size={13}/>{t("billing.addLineItem")}</button>
+                  <div style={{display:"flex",gap:6}}>
+                    {/* Import unbilled time entries for selected matter */}
+                    {invForm.matterId && (() => {
+                      const unbilledTime = timeEntries.filter(te =>
+                        te.matterId === invForm.matterId && te.billable && !te.billed
+                      );
+                      return unbilledTime.length > 0 ? (
+                        <button className="btn btn-outline btn-sm" style={{color:"var(--info)"}} onClick={() => {
+                          const newItems: InvoiceLineItem[] = unbilledTime.map(te => ({
+                            id:          `li_te_${te.id}`,
+                            description: `${t(`time.activities.${te.activity}`)} — ${te.date} (${te.hours}h @ ${fmt(te.billingRate)}/h)`,
+                            quantity:    te.hours,
+                            rate:        te.billingRate,
+                            amount:      te.hours * te.billingRate,
+                            type:        "time" as const,
+                            timeEntryId: te.id,
+                          } as any));
+                          setLineItems(prev => {
+                            const existing = prev.filter(li => !(li as any).timeEntryId);
+                            return [...existing, ...newItems];
+                          });
+                        }}>
+                          <Clock size={13}/> Import {unbilledTime.length} Time {unbilledTime.length===1?"Entry":"Entries"} ({unbilledTime.reduce((s,te)=>s+te.hours,0).toFixed(1)}h)
+                        </button>
+                      ) : null;
+                    })()}
+                    {/* Import billable expenses for selected matter */}
+                    {invForm.matterId && (() => {
+                      const unbilledExp = expenses.filter(e =>
+                        e.matterId === invForm.matterId && e.billable && !e.billed
+                      );
+                      return unbilledExp.length > 0 ? (
+                        <button className="btn btn-outline btn-sm" style={{color:"var(--warning)"}} onClick={() => {
+                          const newItems: InvoiceLineItem[] = unbilledExp.map(e => ({
+                            id:          `li_exp_${e.id}`,
+                            description: `${e.category.replace("_"," ")} — ${e.description}`,
+                            quantity:    1,
+                            rate:        e.amount,
+                            amount:      e.amount,
+                            type:        "expense" as const,
+                            expenseId:   e.id,
+                          } as any));
+                          setLineItems(prev => {
+                            const existing = prev.filter(li => !(li as any).expenseId);
+                            return [...existing, ...newItems];
+                          });
+                        }}>
+                          <Download size={13}/> Import {unbilledExp.length} Expense{unbilledExp.length!==1?"s":""}
+                        </button>
+                      ) : null;
+                    })()}
+                    <button className="btn btn-outline btn-sm" onClick={addLineItem}><Plus size={13}/>{t("billing.addLineItem")}</button>
+                  </div>
                 </div>
                 {lineItems.length === 0 ? (
                   <div style={{border:"2px dashed var(--gray-200)",borderRadius:8,padding:16,textAlign:"center",color:"var(--gray-400)",fontSize:13}}>
-                    Click "+ Add Line Item" to add fees, time charges or disbursements
+                    {invForm.matterId
+                      ? "Use the buttons above to import time entries or expenses, or click \"+ Add Line Item\""
+                      : "Select a Matter first to import time entries and expenses"}
                   </div>
                 ) : (
                   <table style={{width:"100%",borderCollapse:"collapse"}}>

@@ -20,33 +20,43 @@ function saveToFirestore(col: string, item: any) {
 
 // ── Generic collection state with Firestore real-time sync ────────────────
 function useCollectionState<T extends { id: string }>(col: string) {
-  const [items, setItems] = useState<T[]>([]);
-  const itemsRef          = useRef<T[]>([]);   // always holds latest value
+  const [items, setItems]     = useState<T[]>([]);
+  const itemsRef              = useRef<T[]>([]);
+  const lastLocalWriteRef     = useRef<number>(0); // timestamp of last local write
 
   // Keep ref in sync with state
   useEffect(() => { itemsRef.current = items; }, [items]);
 
-  // Subscribe to Firestore real-time updates
+  // Subscribe to Firestore — but SKIP snapshot if a local write just happened
+  // (prevents Firestore overwriting fresh local state before write propagates)
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, col),
-      snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T))),
-      ()   => {} // offline — keep local state as-is
+      snap => {
+        const msSinceLocalWrite = Date.now() - lastLocalWriteRef.current;
+        if (msSinceLocalWrite < 3000) return; // ignore snapshot for 3s after local write
+        setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T)));
+      },
+      () => {} // offline — keep local state as-is
     );
     return unsub;
   }, [col]);
 
-  // Setter: updates local state immediately, then writes to Firestore
+  // Setter: updates local state IMMEDIATELY, then writes to Firestore in background
   const setter = useCallback((value: T[] | ((prev: T[]) => T[])) => {
     const prev = itemsRef.current;
     const next = typeof value === "function" ? value(prev) : value;
 
-    // 1. Update UI instantly
-    setItems(next);
+    // Mark local write time (suppresses Firestore snapshot for 3s)
+    lastLocalWriteRef.current = Date.now();
 
-    // 2. Write new/changed items to Firestore (outside React render)
+    // 1. Update UI instantly — guaranteed, no network needed
+    setItems(next);
+    itemsRef.current = next;
+
+    // 2. Write new/changed items to Firestore in background
     next.forEach(item => {
-      const existing = prev.find(p => p.id === item.id);
+      const existing  = prev.find(p => p.id === item.id);
       const isNew     = !existing;
       const isChanged = existing && JSON.stringify(existing) !== JSON.stringify(item);
       if (isNew || isChanged) {
