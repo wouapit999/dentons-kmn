@@ -190,10 +190,48 @@ export interface InvoiceLineItem {
 export interface Payment {
   id: string;
   invoiceId: string;
+  clientId: string;
+  matterId: string;
   amount: number;
+  currency: string;
   date: string;
-  method: string;
+  method: "bankTransfer" | "mobileMoney" | "cash" | "check" | "card";
   reference?: string;
+  notes?: string;
+  receiptNumber?: string;
+}
+
+export type ExpenseCategory =
+  | "court_fees" | "travel" | "printing" | "postage" | "filing"
+  | "expert_fees" | "translation" | "meals" | "accommodation" | "office" | "other";
+
+export interface Expense {
+  id: string;
+  matterId?: string;
+  clientId?: string;
+  userId: string;
+  date: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  currency: string;
+  billable: boolean;
+  billed: boolean;
+  receipt?: string;
+  approved: boolean;
+}
+
+export interface Retainer {
+  id: string;
+  clientId: string;
+  matterId?: string;
+  amount: number;
+  currency: string;
+  startDate: string;
+  endDate?: string;
+  billingCycle: "monthly" | "quarterly" | "annual" | "onetime";
+  status: "active" | "depleted" | "cancelled";
+  balanceUsed: number;
   notes?: string;
 }
 

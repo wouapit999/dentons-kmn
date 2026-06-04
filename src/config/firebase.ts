@@ -23,6 +23,9 @@ export const db  = getFirestore(app);
 enableIndexedDbPersistence(db).catch(() => {/* multi-tab mode — ignore */});
 
 export const COLLECTIONS = {
+  PAYMENTS:           "payments",
+  EXPENSES:           "expenses",
+  RETAINERS:          "retainers",
   USERS:              "users",
   MATTERS:            "matters",
   CLIENTS:            "clients",

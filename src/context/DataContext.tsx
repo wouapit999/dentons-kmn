@@ -6,7 +6,8 @@ import {
 import { db, COLLECTIONS } from "../config/firebase";
 import {
   Matter, Client, Document, Task, TimeEntry,
-  Invoice, TrustAccount, TrustTransaction, AuditLog, CalendarEvent
+  Invoice, TrustAccount, TrustTransaction, AuditLog, CalendarEvent,
+  Payment, Expense, Retainer
 } from "../types";
 
 // ── Write one item to Firestore (background, never throws) ────────────────
@@ -79,6 +80,12 @@ interface DataContextType {
   setAuditLogs:         (v: AuditLog[]         | ((p: AuditLog[])         => AuditLog[]))         => void;
   calendarEvents:       CalendarEvent[];
   setCalendarEvents:    (v: CalendarEvent[]    | ((p: CalendarEvent[])    => CalendarEvent[]))    => void;
+  payments:             Payment[];
+  setPayments:          (v: Payment[]          | ((p: Payment[])          => Payment[]))          => void;
+  expenses:             Expense[];
+  setExpenses:          (v: Expense[]          | ((p: Expense[])          => Expense[]))          => void;
+  retainers:            Retainer[];
+  setRetainers:         (v: Retainer[]         | ((p: Retainer[])         => Retainer[]))         => void;
   loading:              boolean;
   addDoc_:     (col: string, data: any) => Promise<string>;
   updateDoc_:  (col: string, id: string, data: any) => Promise<void>;
@@ -100,6 +107,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [trustTransactions, setTrustTransactions] = useCollectionState<TrustTransaction>(COLLECTIONS.TRUST_TRANSACTIONS);
   const [auditLogs,         setAuditLogs]         = useCollectionState<AuditLog>(COLLECTIONS.AUDIT_LOGS);
   const [calendarEvents,    setCalendarEvents]    = useCollectionState<CalendarEvent>(COLLECTIONS.CALENDAR_EVENTS);
+  const [payments,          setPayments]          = useCollectionState<Payment>(COLLECTIONS.PAYMENTS);
+  const [expenses,          setExpenses]          = useCollectionState<Expense>(COLLECTIONS.EXPENSES);
+  const [retainers,         setRetainers]         = useCollectionState<Retainer>(COLLECTIONS.RETAINERS);
 
   const loading = false; // UI never blocks on loading
 
@@ -143,6 +153,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       trustTransactions, setTrustTransactions,
       auditLogs, setAuditLogs,
       calendarEvents, setCalendarEvents,
+      payments, setPayments,
+      expenses, setExpenses,
+      retainers, setRetainers,
       loading, addDoc_, updateDoc_, deleteDoc_, addAuditLog,
     }}>
       {children}
