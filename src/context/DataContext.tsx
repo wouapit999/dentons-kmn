@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import {
-  collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc,
+  collection, onSnapshot, doc, setDoc,
   addDoc as fsAddDoc
 } from "firebase/firestore";
 import { db, COLLECTIONS } from "../config/firebase";
@@ -9,149 +9,99 @@ import {
   Invoice, TrustAccount, TrustTransaction, AuditLog, CalendarEvent
 } from "../types";
 
-// ── Generic hook: local state + Firestore real-time sync ───────────────────
-function useFirestoreState<T extends { id: string }>(col: string): [
-  T[],
-  React.Dispatch<React.SetStateAction<T[]>>,
-  boolean
-] {
-  const [data, setData]       = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+// ── Write one item to Firestore (background, never throws) ────────────────
+function saveToFirestore(col: string, item: any) {
+  try {
+    const { id, ...data } = item;
+    setDoc(doc(db, col, id), data, { merge: true }).catch(() => {});
+  } catch {}
+}
 
+// ── Generic collection state with Firestore real-time sync ────────────────
+function useCollectionState<T extends { id: string }>(col: string) {
+  const [items, setItems] = useState<T[]>([]);
+  const itemsRef          = useRef<T[]>([]);   // always holds latest value
+
+  // Keep ref in sync with state
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+  // Subscribe to Firestore real-time updates
   useEffect(() => {
-    let unsubscribed = false;
     const unsub = onSnapshot(
       collection(db, col),
-      snap => {
-        if (!unsubscribed) {
-          setData(snap.docs.map(d => ({ id: d.id, ...d.data() } as T)));
-          setLoading(false);
-        }
-      },
-      err => {
-        console.warn(`Firestore ${col} offline, using local state:`, err.message);
-        setLoading(false);
-      }
+      snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T))),
+      ()   => {} // offline — keep local state as-is
     );
-    return () => { unsubscribed = true; unsub(); };
+    return unsub;
   }, [col]);
 
-  return [data, setData, loading];
-}
+  // Setter: updates local state immediately, then writes to Firestore
+  const setter = useCallback((value: T[] | ((prev: T[]) => T[])) => {
+    const prev = itemsRef.current;
+    const next = typeof value === "function" ? value(prev) : value;
 
-// ── Write a single item to Firestore (background, non-blocking) ────────────
-function persistItem(col: string, item: any) {
-  const { id, ...data } = item;
-  setDoc(doc(db, col, id), data, { merge: true }).catch(() => {
-    // Silently ignore — local state already updated
-  });
-}
+    // 1. Update UI instantly
+    setItems(next);
 
-// ── Make a setter that updates local state immediately + syncs to Firestore ─
-function makeOptimisticSetter<T extends { id: string }>(
-  col: string,
-  setLocal: React.Dispatch<React.SetStateAction<T[]>>
-) {
-  return (value: T[] | ((prev: T[]) => T[])): void => {
-    setLocal(prev => {
-      const next = typeof value === "function" ? value(prev) : value;
-
-      // Find items that are new or changed compared to previous state
-      next.forEach(item => {
-        const existing = prev.find(p => p.id === item.id);
-        const isNew     = !existing;
-        const isChanged = existing && JSON.stringify(existing) !== JSON.stringify(item);
-        if (isNew || isChanged) {
-          persistItem(col, item);
-        }
-      });
-
-      return next;
+    // 2. Write new/changed items to Firestore (outside React render)
+    next.forEach(item => {
+      const existing = prev.find(p => p.id === item.id);
+      const isNew     = !existing;
+      const isChanged = existing && JSON.stringify(existing) !== JSON.stringify(item);
+      if (isNew || isChanged) {
+        saveToFirestore(col, item);
+      }
     });
-  };
+  }, [col]);
+
+  return [items, setter] as const;
 }
 
-// ── Context type ───────────────────────────────────────────────────────────
+// ── Context type ──────────────────────────────────────────────────────────
 interface DataContextType {
-  matters:           Matter[];
-  setMatters:        (v: Matter[]           | ((p: Matter[])           => Matter[]))           => void;
-  clients:           Client[];
-  setClients:        (v: Client[]           | ((p: Client[])           => Client[]))           => void;
-  documents:         Document[];
-  setDocuments:      (v: Document[]         | ((p: Document[])         => Document[]))         => void;
-  tasks:             Task[];
-  setTasks:          (v: Task[]             | ((p: Task[])             => Task[]))             => void;
-  timeEntries:       TimeEntry[];
-  setTimeEntries:    (v: TimeEntry[]        | ((p: TimeEntry[])        => TimeEntry[]))        => void;
-  invoices:          Invoice[];
-  setInvoices:       (v: Invoice[]          | ((p: Invoice[])          => Invoice[]))          => void;
-  trustAccounts:     TrustAccount[];
-  setTrustAccounts:  (v: TrustAccount[]    | ((p: TrustAccount[])    => TrustAccount[]))    => void;
-  trustTransactions: TrustTransaction[];
+  matters:              Matter[];
+  setMatters:           (v: Matter[]           | ((p: Matter[])           => Matter[]))           => void;
+  clients:              Client[];
+  setClients:           (v: Client[]           | ((p: Client[])           => Client[]))           => void;
+  documents:            Document[];
+  setDocuments:         (v: Document[]         | ((p: Document[])         => Document[]))         => void;
+  tasks:                Task[];
+  setTasks:             (v: Task[]             | ((p: Task[])             => Task[]))             => void;
+  timeEntries:          TimeEntry[];
+  setTimeEntries:       (v: TimeEntry[]        | ((p: TimeEntry[])        => TimeEntry[]))        => void;
+  invoices:             Invoice[];
+  setInvoices:          (v: Invoice[]          | ((p: Invoice[])          => Invoice[]))          => void;
+  trustAccounts:        TrustAccount[];
+  setTrustAccounts:     (v: TrustAccount[]     | ((p: TrustAccount[])     => TrustAccount[]))     => void;
+  trustTransactions:    TrustTransaction[];
   setTrustTransactions: (v: TrustTransaction[] | ((p: TrustTransaction[]) => TrustTransaction[])) => void;
-  auditLogs:         AuditLog[];
-  setAuditLogs:      (v: AuditLog[]         | ((p: AuditLog[])         => AuditLog[]))         => void;
-  calendarEvents:    CalendarEvent[];
-  setCalendarEvents: (v: CalendarEvent[]   | ((p: CalendarEvent[])   => CalendarEvent[]))   => void;
-  loading:           boolean;
-  addDoc_:    (col: string, data: any) => Promise<string>;
-  updateDoc_: (col: string, id: string, data: any) => Promise<void>;
-  deleteDoc_: (col: string, id: string) => Promise<void>;
+  auditLogs:            AuditLog[];
+  setAuditLogs:         (v: AuditLog[]         | ((p: AuditLog[])         => AuditLog[]))         => void;
+  calendarEvents:       CalendarEvent[];
+  setCalendarEvents:    (v: CalendarEvent[]    | ((p: CalendarEvent[])    => CalendarEvent[]))    => void;
+  loading:              boolean;
+  addDoc_:     (col: string, data: any) => Promise<string>;
+  updateDoc_:  (col: string, id: string, data: any) => Promise<void>;
+  deleteDoc_:  (col: string, id: string) => Promise<void>;
   addAuditLog: (action: string, entityType: string, entityId: string, details?: string, userId?: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// ── Provider ───────────────────────────────────────────────────────────────
+// ── Provider ──────────────────────────────────────────────────────────────
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [matters,           setMattersLocal,           mattersLoading]  = useFirestoreState<Matter>(COLLECTIONS.MATTERS);
-  const [clients,           setClientsLocal,           clientsLoading]  = useFirestoreState<Client>(COLLECTIONS.CLIENTS);
-  const [documents,         setDocumentsLocal]                          = useFirestoreState<Document>(COLLECTIONS.DOCUMENTS);
-  const [tasks,             setTasksLocal]                              = useFirestoreState<Task>(COLLECTIONS.TASKS);
-  const [timeEntries,       setTimeEntriesLocal]                        = useFirestoreState<TimeEntry>(COLLECTIONS.TIME_ENTRIES);
-  const [invoices,          setInvoicesLocal]                           = useFirestoreState<Invoice>(COLLECTIONS.INVOICES);
-  const [trustAccounts,     setTrustAccountsLocal]                      = useFirestoreState<TrustAccount>(COLLECTIONS.TRUST_ACCOUNTS);
-  const [trustTransactions, setTrustTransactionsLocal]                  = useFirestoreState<TrustTransaction>(COLLECTIONS.TRUST_TRANSACTIONS);
-  const [auditLogs,         setAuditLogsLocal]                          = useFirestoreState<AuditLog>(COLLECTIONS.AUDIT_LOGS);
-  const [calendarEvents,    setCalendarEventsLocal]                     = useFirestoreState<CalendarEvent>(COLLECTIONS.CALENDAR_EVENTS);
+  const [matters,           setMatters]           = useCollectionState<Matter>(COLLECTIONS.MATTERS);
+  const [clients,           setClients]           = useCollectionState<Client>(COLLECTIONS.CLIENTS);
+  const [documents,         setDocuments]         = useCollectionState<Document>(COLLECTIONS.DOCUMENTS);
+  const [tasks,             setTasks]             = useCollectionState<Task>(COLLECTIONS.TASKS);
+  const [timeEntries,       setTimeEntries]       = useCollectionState<TimeEntry>(COLLECTIONS.TIME_ENTRIES);
+  const [invoices,          setInvoices]          = useCollectionState<Invoice>(COLLECTIONS.INVOICES);
+  const [trustAccounts,     setTrustAccounts]     = useCollectionState<TrustAccount>(COLLECTIONS.TRUST_ACCOUNTS);
+  const [trustTransactions, setTrustTransactions] = useCollectionState<TrustTransaction>(COLLECTIONS.TRUST_TRANSACTIONS);
+  const [auditLogs,         setAuditLogs]         = useCollectionState<AuditLog>(COLLECTIONS.AUDIT_LOGS);
+  const [calendarEvents,    setCalendarEvents]    = useCollectionState<CalendarEvent>(COLLECTIONS.CALENDAR_EVENTS);
 
-  const loading = mattersLoading || clientsLoading;
-
-  // Optimistic setters — update UI instantly, sync to Firestore in background
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setMatters           = useCallback(makeOptimisticSetter(COLLECTIONS.MATTERS,            setMattersLocal),           []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setClients           = useCallback(makeOptimisticSetter(COLLECTIONS.CLIENTS,            setClientsLocal),           []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setDocuments         = useCallback(makeOptimisticSetter(COLLECTIONS.DOCUMENTS,          setDocumentsLocal),         []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setTasks             = useCallback(makeOptimisticSetter(COLLECTIONS.TASKS,              setTasksLocal),             []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setTimeEntries       = useCallback(makeOptimisticSetter(COLLECTIONS.TIME_ENTRIES,       setTimeEntriesLocal),       []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setInvoices          = useCallback(makeOptimisticSetter(COLLECTIONS.INVOICES,           setInvoicesLocal),          []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setTrustAccounts     = useCallback(makeOptimisticSetter(COLLECTIONS.TRUST_ACCOUNTS,     setTrustAccountsLocal),     []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setTrustTransactions = useCallback(makeOptimisticSetter(COLLECTIONS.TRUST_TRANSACTIONS, setTrustTransactionsLocal), []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setAuditLogs         = useCallback(makeOptimisticSetter(COLLECTIONS.AUDIT_LOGS,         setAuditLogsLocal),         []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setCalendarEvents    = useCallback(makeOptimisticSetter(COLLECTIONS.CALENDAR_EVENTS,    setCalendarEventsLocal),    []);
-
-  // ── Direct Firestore CRUD helpers ─────────────────────────────────────────
-  const addDoc_ = useCallback(async (col: string, data: any): Promise<string> => {
-    const ref = await fsAddDoc(collection(db, col), { ...data, _createdAt: new Date().toISOString() });
-    return ref.id;
-  }, []);
-
-  const updateDoc_ = useCallback(async (col: string, id: string, data: any): Promise<void> => {
-    await updateDoc(doc(db, col, id), { ...data, _updatedAt: new Date().toISOString() });
-  }, []);
-
-  const deleteDoc_ = useCallback(async (col: string, id: string): Promise<void> => {
-    await deleteDoc(doc(db, col, id));
-  }, []);
+  const loading = false; // UI never blocks on loading
 
   const addAuditLog = useCallback((
     action: string, entityType: string, entityId: string,
@@ -159,8 +109,26 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     fsAddDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
       userId: userId || "system", action, entityType, entityId,
-      timestamp: new Date().toISOString(), ipAddress: "—", details: details || "",
+      timestamp: new Date().toISOString(), ipAddress: "—",
+      details: details || "",
     }).catch(() => {});
+  }, []);
+
+  // Keep addDoc_ and updateDoc_ for components that use them directly
+  const addDoc_    = useCallback(async (col: string, data: any): Promise<string> => {
+    const ref = await fsAddDoc(collection(db, col), { ...data, _createdAt: new Date().toISOString() });
+    return ref.id;
+  }, []);
+
+  const updateDoc_ = useCallback(async (col: string, id: string, data: any): Promise<void> => {
+    saveToFirestore(col, { id, ...data });
+  }, []);
+
+  const deleteDoc_ = useCallback(async (col: string, id: string): Promise<void> => {
+    try {
+      const { deleteDoc: fsDeleteDoc } = await import("firebase/firestore");
+      await fsDeleteDoc(doc(db, col, id));
+    } catch {}
   }, []);
 
   return (
