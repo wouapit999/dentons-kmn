@@ -7,12 +7,13 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 const firebaseConfig = {
- apiKey:            "AIzaSy...",
-authDomain:        "dentons-kmn.firebaseapp.com",
-projectId:         "dentons-kmn",
-storageBucket:     "dentons-kmn.appspot.com",
-messagingSenderId: "123456789",
-appId:             "1:123:web:abc123",
+  apiKey:            "AIzaSyC5zm9WOA8cKB_voDJtWGJuXoj9u4V26vY",
+  authDomain:        "dentons-kmn.firebaseapp.com",
+  databaseURL:       "https://dentons-kmn-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "dentons-kmn",
+  storageBucket:     "dentons-kmn.firebasestorage.app",
+  messagingSenderId: "689398115566",
+  appId:             "1:689398115566:web:c908e00b64b451802217ff",
 };
 
 export const app = initializeApp(firebaseConfig);
