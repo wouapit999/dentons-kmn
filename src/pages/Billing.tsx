@@ -2,7 +2,8 @@ import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus, Eye, Send, CheckCircle, X, AlertCircle,
-  FileText, CreditCard, Printer, TrendingUp, Clock, Download
+  FileText, CreditCard, Printer, TrendingUp, Clock, Download,
+  FileDown, FileSpreadsheet
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -10,8 +11,9 @@ import {
 } from "recharts";
 import { useApp } from "../context/AppContext";
 import { useData } from "../context/DataContext";
-import { Invoice, InvoiceStatus, InvoiceLineItem, Expense, ExpenseCategory } from "../types";
+import { Invoice, InvoiceStatus, Expense, ExpenseCategory, InvoiceLineItem } from "../types";
 import Logo from "../components/ui/Logo";
+import { exportToExcel, exportToPDF, exportInvoices, exportExpenses, exportPayments } from "../utils/exportUtils";
 
 const TAX_RATE = 19.25;
 const fmt = (n: number) =>
@@ -46,6 +48,9 @@ export default function Billing() {
   const [payForm, setPayForm] = useState({ amount:0, date:new Date().toISOString().split("T")[0], method:"bankTransfer", reference:"", notes:"" });
   const [expForm, setExpForm] = useState<Partial<Expense>>({ date:new Date().toISOString().split("T")[0], billable:true, approved:false, currency:"XAF", category:"other" });
   const [retForm, setRetForm] = useState({ clientId:"", amount:0, currency:"XAF", startDate:new Date().toISOString().split("T")[0], billingCycle:"monthly", notes:"" });
+
+  // Admin and Finance can change statuses
+  const canManage = ["admin","finance","managingPartner"].includes(currentUser?.role || "");
 
   const getClient = (id: string) => clients.find(c => c.id === id);
   const getMatter = (id: string) => matters.find(m => m.id === id);
@@ -472,12 +477,25 @@ export default function Billing() {
       {/* ── INVOICES TAB ── */}
       {tab==="invoices" && (
         <div>
-          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap"}}>
             {["all","draft","sent","partial","paid","overdue","cancelled"].map(s => (
               <button key={s} className={`btn ${statusFilter===s?"btn-primary":"btn-outline"} btn-sm`} onClick={() => setStatusFilter(s)}>
                 {s==="all" ? t("common.all") : t(`billing.statuses.${s}`)}
               </button>
             ))}
+            </div>
+            {/* Export buttons */}
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportInvoices(invoices.filter(i => statusFilter==="all"||i.status===statusFilter), clients, matters);
+                exportToPDF(data, cols, "Invoice Report — Dentons KMN", `DK_Invoices_${new Date().toISOString().split("T")[0]}`);
+              }}><FileDown size={14}/> PDF</button>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportInvoices(invoices.filter(i => statusFilter==="all"||i.status===statusFilter), clients, matters);
+                exportToExcel(data, cols, `DK_Invoices_${new Date().toISOString().split("T")[0]}`, "Invoices");
+              }}><FileSpreadsheet size={14}/> Excel</button>
+            </div>
           </div>
           <div className="card">
             <div className="table-container">
@@ -495,7 +513,20 @@ export default function Billing() {
                       <td style={{fontSize:12,color:inv.status==="overdue"?"var(--danger)":"inherit",fontWeight:inv.status==="overdue"?700:400}}>{inv.dueDate}</td>
                       <td style={{textAlign:"right",fontWeight:500}}>{fmt(inv.total)}</td>
                       <td style={{textAlign:"right",fontWeight:700,color:inv.total-inv.amountPaid===0?"var(--success)":"var(--gray-900)"}}>{fmt(inv.total-inv.amountPaid)}</td>
-                      <td>{statusBadge(inv.status)}</td>
+                      <td>
+                        {canManage ? (
+                          <select
+                            className="filter-select"
+                            style={{fontSize:11,padding:"3px 6px",fontWeight:600}}
+                            value={inv.status}
+                            onChange={e => setInvoices(prev => prev.map(i => i.id===inv.id ? {...i,status:e.target.value as InvoiceStatus} : i))}
+                          >
+                            {["draft","sent","partial","paid","overdue","cancelled"].map(s=>(
+                              <option key={s} value={s}>{t(`billing.statuses.${s}`)}</option>
+                            ))}
+                          </select>
+                        ) : statusBadge(inv.status)}
+                      </td>
                       <td>
                         <div style={{display:"flex",gap:4}}>
                           <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedInvoice(inv)}><Eye size={14}/></button>
@@ -524,7 +555,17 @@ export default function Billing() {
         <div className="card">
           <div className="card-header">
             <span className="card-title">Payment Register</span>
-            <span style={{color:"var(--success)",fontWeight:600,fontSize:14}}>{fmt(payments.reduce((s,p) => s+p.amount, 0))} received</span>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{color:"var(--success)",fontWeight:600,fontSize:14}}>{fmt(payments.reduce((s,p) => s+p.amount, 0))} received</span>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportPayments(payments, invoices, clients);
+                exportToPDF(data, cols, "Payment Register — Dentons KMN", `DK_Payments_${new Date().toISOString().split("T")[0]}`);
+              }}><FileDown size={13}/> PDF</button>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportPayments(payments, invoices, clients);
+                exportToExcel(data, cols, `DK_Payments_${new Date().toISOString().split("T")[0]}`, "Payments");
+              }}><FileSpreadsheet size={13}/> Excel</button>
+            </div>
           </div>
           <div className="table-container">
             <table>
@@ -556,7 +597,17 @@ export default function Billing() {
               <span style={{fontWeight:600,color:"var(--navy)"}}>Total: {fmt(totalExpenses)}</span>
               <span style={{color:"var(--success)",fontWeight:500}}>Billable: {fmt(expenses.filter(e=>e.billable).reduce((s,e)=>s+e.amount,0))}</span>
             </div>
-            <button className="btn btn-gold btn-sm" onClick={() => setShowExpenseModal(true)}><Plus size={14}/> Add Expense</button>
+            <div style={{display:"flex",gap:6}}>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportExpenses(expenses, matters, users);
+                exportToPDF(data, cols, "Expense Report — Dentons KMN", `DK_Expenses_${new Date().toISOString().split("T")[0]}`);
+              }}><FileDown size={14}/> PDF</button>
+              <button className="btn btn-outline btn-sm" onClick={() => {
+                const { data, cols } = exportExpenses(expenses, matters, users);
+                exportToExcel(data, cols, `DK_Expenses_${new Date().toISOString().split("T")[0]}`, "Expenses");
+              }}><FileSpreadsheet size={14}/> Excel</button>
+              <button className="btn btn-gold btn-sm" onClick={() => setShowExpenseModal(true)}><Plus size={14}/> Add Expense</button>
+            </div>
           </div>
           <div className="card">
             <div className="table-container">
@@ -572,7 +623,28 @@ export default function Billing() {
                       <td style={{fontSize:12}}>{getUser(e.userId)}</td>
                       <td style={{textAlign:"right",fontWeight:600}}>{fmt(e.amount)}</td>
                       <td><span className={`badge ${e.billable?"badge-green":"badge-gray"}`}>{e.billable?"Billable":"Non-bill."}</span></td>
-                      <td><span className={`badge ${e.approved?"badge-green":e.billed?"badge-blue":"badge-yellow"}`}>{e.approved?"Approved":e.billed?"Billed":"Pending"}</span></td>
+                      <td>
+                        {canManage ? (
+                          <select
+                            className="filter-select"
+                            style={{fontSize:11,padding:"3px 6px",fontWeight:600}}
+                            value={e.approved?"approved":e.billed?"billed":"pending"}
+                            onChange={ev => setExpenses(prev => prev.map(x => x.id===e.id ? {
+                              ...x,
+                              approved: ev.target.value==="approved",
+                              billed:   ev.target.value==="billed" || ev.target.value==="approved",
+                            } : x))}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="billed">Billed</option>
+                          </select>
+                        ) : (
+                          <span className={`badge ${e.approved?"badge-green":e.billed?"badge-blue":"badge-yellow"}`}>
+                            {e.approved?"Approved":e.billed?"Billed":"Pending"}
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {!expenses.length && <tr><td colSpan={8}><div className="empty-state"><div className="empty-state-text">No expenses recorded</div></div></td></tr>}
@@ -600,7 +672,20 @@ export default function Billing() {
                       <div style={{fontWeight:700,color:"var(--navy)"}}>{cl?.name}</div>
                       <div style={{fontSize:12,color:"var(--gray-500)",marginTop:2}}>{r.billingCycle} · {r.startDate}</div>
                     </div>
-                    <span className={`badge badge-${r.status==="active"?"green":r.status==="depleted"?"red":"gray"}`}>{r.status}</span>
+                    {canManage ? (
+                      <select
+                        className="filter-select"
+                        style={{fontSize:11,padding:"3px 6px",fontWeight:600}}
+                        value={r.status}
+                        onChange={e => setRetainers(prev => prev.map(x => x.id===r.id ? {...x, status: e.target.value as any} : x))}
+                      >
+                        <option value="active">Active</option>
+                        <option value="depleted">Depleted</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    ) : (
+                      <span className={`badge badge-${r.status==="active"?"green":r.status==="depleted"?"red":"gray"}`}>{r.status}</span>
+                    )}
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                     <span style={{fontSize:12,color:"var(--gray-500)"}}>Retainer</span>

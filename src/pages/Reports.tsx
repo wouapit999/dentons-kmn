@@ -1,9 +1,14 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { FileDown, FileSpreadsheet } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { useData } from "../context/DataContext";
 import Logo from "../components/ui/Logo";
+import {
+  exportToExcel, exportToPDF,
+  exportInvoices, exportMatterProfitability
+} from "../utils/exportUtils";
 
 const fmt = (n: number) => new Intl.NumberFormat("fr-CM", { style:"currency", currency:"XAF", maximumFractionDigits:0 }).format(n);
 const COLORS = ["#0B1F3A","#C9A84C","#1A7F4B","#C0392B","#1D6FA4","#6741D9","#B45309"];
@@ -11,7 +16,7 @@ const COLORS = ["#0B1F3A","#C9A84C","#1A7F4B","#C0392B","#1D6FA4","#6741D9","#B4
 export default function Reports() {
   const { t } = useTranslation();
   const { users } = useApp();
-  const { matters, invoices, timeEntries, clients } = useData();
+  const { matters, invoices, timeEntries, clients, expenses } = useData();
   const [activeReport, setActiveReport] = useState("financial");
   const [dateFrom, setDateFrom] = useState(new Date().getFullYear()+"-01-01");
   const [dateTo, setDateTo] = useState(new Date().getFullYear()+"-12-31");
@@ -53,8 +58,43 @@ export default function Reports() {
         <div style={{display:"flex",gap:10}}>
           <input className="form-control" type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{width:160}}/>
           <input className="form-control" type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{width:160}}/>
-          <button className="btn btn-outline">{t("reports.exportPdf")}</button>
-          <button className="btn btn-outline">{t("reports.exportExcel")}</button>
+          {/* Dynamic export based on active tab */}
+          <button className="btn btn-outline" onClick={() => {
+            if (activeReport === "financial") {
+              const { data, cols } = exportInvoices(invoices, clients, matters);
+              exportToPDF(data, cols, "Financial Report — Invoices", `DK_Invoices_${dateFrom}_${dateTo}`);
+            } else if (activeReport === "matters") {
+              const { data, cols } = exportMatterProfitability(matters, invoices, expenses, clients);
+              exportToPDF(data, cols, "Matter Profitability Report", `DK_Matters_${dateFrom}`);
+            } else if (activeReport === "time") {
+              const data = users.filter(u => u.billingRate > 0).map(u => {
+                const hrs = timeEntries.filter(te => te.userId === u.id);
+                return { name:`${u.firstName} ${u.lastName}`, role:u.role, total:hrs.reduce((s,te)=>s+te.hours,0).toFixed(1)+"h", billable:hrs.filter(te=>te.billable).reduce((s,te)=>s+te.hours,0).toFixed(1)+"h", amount:fmt(hrs.filter(te=>te.billable).reduce((s,te)=>s+te.hours*te.billingRate,0)) };
+              });
+              exportToPDF(data,[{key:"name",label:"Name"},{key:"role",label:"Role"},{key:"total",label:"Total Hours"},{key:"billable",label:"Billable Hours"},{key:"amount",label:"Billable Amount"}],"Lawyer Productivity",`DK_Productivity_${dateFrom}`);
+            } else {
+              const { data, cols } = exportInvoices(invoices, clients, matters);
+              exportToPDF(data, cols, "Client Report", `DK_Clients_${dateFrom}`);
+            }
+          }}><FileDown size={15}/>{t("reports.exportPdf")}</button>
+          <button className="btn btn-outline" onClick={() => {
+            if (activeReport === "financial") {
+              const { data, cols } = exportInvoices(invoices, clients, matters);
+              exportToExcel(data, cols, `DK_Invoices_${dateFrom}_${dateTo}`, "Invoices");
+            } else if (activeReport === "matters") {
+              const { data, cols } = exportMatterProfitability(matters, invoices, expenses, clients);
+              exportToExcel(data, cols, `DK_Matters_${dateFrom}`, "Matter Profitability");
+            } else if (activeReport === "time") {
+              const data = users.filter(u => u.billingRate > 0).map(u => {
+                const hrs = timeEntries.filter(te => te.userId === u.id);
+                return { Name:`${u.firstName} ${u.lastName}`, Role:u.role, "Total Hours":hrs.reduce((s,te)=>s+te.hours,0).toFixed(1), "Billable Hours":hrs.filter(te=>te.billable).reduce((s,te)=>s+te.hours,0).toFixed(1), "Billable Amount":hrs.filter(te=>te.billable).reduce((s,te)=>s+te.hours*te.billingRate,0) };
+              });
+              exportToExcel(data as any,[{key:"Name",label:"Name"},{key:"Role",label:"Role"},{key:"Total Hours",label:"Total Hours"},{key:"Billable Hours",label:"Billable Hours"},{key:"Billable Amount",label:"Billable Amount"}],`DK_Productivity_${dateFrom}`,"Productivity");
+            } else {
+              const { data, cols } = exportInvoices(invoices, clients, matters);
+              exportToExcel(data, cols, `DK_Clients_${dateFrom}`, "Clients");
+            }
+          }}><FileSpreadsheet size={15}/>{t("reports.exportExcel")}</button>
         </div>
       </div>
 
