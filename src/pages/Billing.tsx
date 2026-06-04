@@ -386,6 +386,7 @@ export default function Billing() {
           ["expenses","💸 Expenses"],
           ["retainers","🔄 Retainers"],
           ["reports","📈 Reports"],
+          ...(canManage ? [["status","🔁 Status Management"]] : []),
         ].map(([k,l]) => (
           <button key={k} className={`tab-btn ${tab===k?"active":""}`} onClick={() => setTab(k)}>{l}</button>
         ))}
@@ -782,6 +783,249 @@ export default function Billing() {
                   {!matters.filter(m => invoices.some(i=>i.matterId===m.id)||expenses.some(e=>e.matterId===m.id)).length && (
                     <tr><td colSpan={6}><div className="empty-state"><div className="empty-state-text">No financial data yet</div></div></td></tr>
                   )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STATUS MANAGEMENT TAB ── */}
+      {tab==="status" && canManage && (
+        <div>
+          <div className="alert alert-gold" style={{marginBottom:20}}>
+            <AlertCircle size={15} style={{flexShrink:0}}/>
+            <span>This panel is restricted to <strong>Administrator, Finance & Managing Partners</strong>. All status changes are logged in the Audit Trail.</span>
+          </div>
+
+          {/* ── TIME ENTRIES STATUS ── */}
+          <div className="card" style={{marginBottom:20}}>
+            <div className="card-header">
+              <span className="card-title">⏱ Time Entries — Approval Status</span>
+              <span style={{fontSize:12,color:"var(--gray-500)"}}>{timeEntries.filter(te=>!te.approved).length} pending approval</span>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th><th>Lawyer</th><th>Matter</th><th>Activity</th>
+                    <th style={{textAlign:"right"}}>Hours</th><th style={{textAlign:"right"}}>Amount</th>
+                    <th>Billable</th><th>Approval</th><th>Billing</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeEntries.length === 0 && (
+                    <tr><td colSpan={10}><div className="empty-state"><div className="empty-state-text">No time entries yet</div></div></td></tr>
+                  )}
+                  {timeEntries.map(te => (
+                    <tr key={te.id} style={{opacity: te.approved ? 1 : 0.85}}>
+                      <td style={{fontSize:12}}>{te.date}</td>
+                      <td style={{fontSize:13,fontWeight:500}}>{getUser(te.userId)}</td>
+                      <td style={{fontSize:12}}>{getMatter(te.matterId)?.matterId || "—"}</td>
+                      <td style={{fontSize:12}}>{t(`time.activities.${te.activity}`)}</td>
+                      <td style={{textAlign:"right",fontWeight:600}}>{te.hours}h</td>
+                      <td style={{textAlign:"right",color:"var(--success)",fontWeight:600}}>{fmt(te.hours * te.billingRate)}</td>
+                      <td>
+                        <span className={`badge ${te.billable?"badge-green":"badge-gray"}`}>
+                          {te.billable ? t("time.billable") : t("time.nonBillable")}
+                        </span>
+                      </td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          style={{fontSize:11,padding:"3px 8px",fontWeight:600,color:te.approved?"var(--success)":"var(--warning)"}}
+                          value={te.approved ? "approved" : "pending"}
+                          onChange={e => setTimeEntries(prev => prev.map(x =>
+                            x.id===te.id ? {...x, approved: e.target.value==="approved"} : x
+                          ))}
+                        >
+                          <option value="pending">⏳ Pending</option>
+                          <option value="approved">✅ Approved</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          style={{fontSize:11,padding:"3px 8px",fontWeight:600,color:te.billed?"var(--info)":"var(--gray-500)"}}
+                          value={te.billed ? "billed" : "unbilled"}
+                          onChange={e => setTimeEntries(prev => prev.map(x =>
+                            x.id===te.id ? {...x, billed: e.target.value==="billed"} : x
+                          ))}
+                        >
+                          <option value="unbilled">🔓 Unbilled</option>
+                          <option value="billed">🔒 Billed</option>
+                        </select>
+                      </td>
+                      <td>
+                        {!te.approved && (
+                          <div style={{display:"flex",gap:4}}>
+                            <button className="btn btn-success btn-sm" style={{fontSize:11,padding:"4px 10px"}}
+                              onClick={() => setTimeEntries(prev => prev.map(x => x.id===te.id ? {...x,approved:true} : x))}>
+                              ✅ Approve
+                            </button>
+                            <button className="btn btn-outline btn-sm" style={{fontSize:11,padding:"4px 10px"}}
+                              onClick={() => setTimeEntries(prev => prev.map(x => x.id===te.id ? {...x,billable:false} : x))}>
+                              ✗ Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {timeEntries.filter(te=>!te.approved).length > 0 && (
+              <div style={{padding:"12px 20px",borderTop:"1px solid var(--gray-100)",display:"flex",gap:10}}>
+                <button className="btn btn-success btn-sm" onClick={() => setTimeEntries(prev => prev.map(te => ({...te,approved:true})))}>
+                  ✅ Approve All Pending
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── INVOICES STATUS ── */}
+          <div className="card" style={{marginBottom:20}}>
+            <div className="card-header">
+              <span className="card-title">🧾 Invoices — Status Management</span>
+              <span style={{fontSize:12,color:"var(--gray-500)"}}>{invoices.length} total invoices</span>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Client</th><th>Matter</th><th>Date</th><th style={{textAlign:"right"}}>Total</th><th style={{textAlign:"right"}}>Balance</th><th>Current Status</th><th>Change Status</th></tr>
+                </thead>
+                <tbody>
+                  {invoices.length === 0 && (
+                    <tr><td colSpan={8}><div className="empty-state"><div className="empty-state-text">No invoices yet</div></div></td></tr>
+                  )}
+                  {invoices.map(inv => (
+                    <tr key={inv.id}>
+                      <td><span style={{fontFamily:"monospace",fontSize:12}}>{inv.invoiceNumber}</span></td>
+                      <td style={{fontWeight:500}}>{getClient(inv.clientId)?.name||"—"}</td>
+                      <td style={{fontSize:12}}>{getMatter(inv.matterId)?.matterId||"—"}</td>
+                      <td style={{fontSize:12}}>{inv.invoiceDate}</td>
+                      <td style={{textAlign:"right",fontWeight:600}}>{fmt(inv.total)}</td>
+                      <td style={{textAlign:"right",fontWeight:700,color:inv.total-inv.amountPaid===0?"var(--success)":"var(--warning)"}}>{fmt(inv.total-inv.amountPaid)}</td>
+                      <td>{statusBadge(inv.status)}</td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          style={{fontSize:12,padding:"5px 10px",fontWeight:600,minWidth:130}}
+                          value={inv.status}
+                          onChange={e => setInvoices(prev => prev.map(i =>
+                            i.id===inv.id ? {...i, status: e.target.value as InvoiceStatus} : i
+                          ))}
+                        >
+                          <option value="draft">📝 Draft</option>
+                          <option value="sent">📤 Sent</option>
+                          <option value="partial">💛 Partially Paid</option>
+                          <option value="paid">✅ Paid</option>
+                          <option value="overdue">🔴 Overdue</option>
+                          <option value="cancelled">❌ Cancelled</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── EXPENSES STATUS ── */}
+          <div className="card" style={{marginBottom:20}}>
+            <div className="card-header">
+              <span className="card-title">💸 Expenses — Approval Status</span>
+              <span style={{fontSize:12,color:"var(--gray-500)"}}>{expenses.filter(e=>!e.approved).length} pending approval</span>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Category</th><th>Description</th><th>Matter</th><th style={{textAlign:"right"}}>Amount</th><th>Billable</th><th>Change Status</th></tr>
+                </thead>
+                <tbody>
+                  {expenses.length === 0 && (
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-state-text">No expenses yet</div></div></td></tr>
+                  )}
+                  {expenses.map(e => (
+                    <tr key={e.id}>
+                      <td style={{fontSize:12}}>{e.date}</td>
+                      <td><span className="badge badge-purple">{(e.category||"").replace("_"," ")}</span></td>
+                      <td style={{fontWeight:500}}>{e.description}</td>
+                      <td style={{fontSize:12}}>{e.matterId ? getMatter(e.matterId)?.matterId||"—" : "—"}</td>
+                      <td style={{textAlign:"right",fontWeight:600}}>{fmt(e.amount)}</td>
+                      <td><span className={`badge ${e.billable?"badge-green":"badge-gray"}`}>{e.billable?"Billable":"Non-bill."}</span></td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          style={{fontSize:12,padding:"5px 10px",fontWeight:600,minWidth:140}}
+                          value={e.approved?"approved":e.billed?"billed":"pending"}
+                          onChange={ev => setExpenses(prev => prev.map(x =>
+                            x.id===e.id ? {
+                              ...x,
+                              approved: ev.target.value==="approved",
+                              billed: ev.target.value==="billed" || ev.target.value==="approved"
+                            } : x
+                          ))}
+                        >
+                          <option value="pending">⏳ Pending</option>
+                          <option value="approved">✅ Approved</option>
+                          <option value="billed">🔒 Billed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {expenses.filter(e=>!e.approved).length > 0 && (
+              <div style={{padding:"12px 20px",borderTop:"1px solid var(--gray-100)",display:"flex",gap:10}}>
+                <button className="btn btn-success btn-sm" onClick={() => setExpenses(prev => prev.map(e => ({...e,approved:true,billed:true})))}>
+                  ✅ Approve All Pending Expenses
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── RETAINERS STATUS ── */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">🔄 Retainers — Status Management</span>
+              <span style={{fontSize:12,color:"var(--gray-500)"}}>{retainers.length} retainers</span>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr><th>Client</th><th>Cycle</th><th>Start Date</th><th style={{textAlign:"right"}}>Amount</th><th style={{textAlign:"right"}}>Used</th><th style={{textAlign:"right"}}>Remaining</th><th>Change Status</th></tr>
+                </thead>
+                <tbody>
+                  {retainers.length === 0 && (
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-state-text">No retainers yet</div></div></td></tr>
+                  )}
+                  {retainers.map(r => (
+                    <tr key={r.id}>
+                      <td style={{fontWeight:600}}>{getClient(r.clientId)?.name||"—"}</td>
+                      <td><span className="badge badge-blue">{r.billingCycle}</span></td>
+                      <td style={{fontSize:12}}>{r.startDate}</td>
+                      <td style={{textAlign:"right",fontWeight:600}}>{fmt(r.amount)}</td>
+                      <td style={{textAlign:"right",color:"var(--warning)"}}>{fmt(r.balanceUsed)}</td>
+                      <td style={{textAlign:"right",fontWeight:700,color:r.amount-r.balanceUsed>0?"var(--success)":"var(--danger)"}}>{fmt(r.amount-r.balanceUsed)}</td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          style={{fontSize:12,padding:"5px 10px",fontWeight:600,minWidth:140}}
+                          value={r.status}
+                          onChange={e => setRetainers(prev => prev.map(x =>
+                            x.id===r.id ? {...x, status: e.target.value as any} : x
+                          ))}
+                        >
+                          <option value="active">✅ Active</option>
+                          <option value="depleted">🟡 Depleted</option>
+                          <option value="cancelled">❌ Cancelled</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
