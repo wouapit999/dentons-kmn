@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageCircle, X, Send, RefreshCw, Bot, User, ExternalLink, ChevronDown } from "lucide-react";
+import { findAnswer, FALLBACK } from "../../utils/botKnowledge";
 
 interface Message {
   role:      "user" | "assistant";
@@ -132,46 +133,57 @@ export default function ChatBot() {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
+    // Step 1: Try the built-in knowledge base first (instant, no API needed)
+    const localAnswer = findAnswer(content, lang);
+    if (localAnswer) {
+      setMessages(prev => [...prev, {
+        role:"assistant", content:localAnswer, timestamp:new Date(), lang,
+      }]);
+      setLoading(false);
+      if (!open) setUnread(u => u + 1);
+      return;
+    }
+
+    // Step 2: Try the Claude API for complex questions
     try {
-      // Tell the API which language to respond in
       const langInstruction = lang === "fr"
-        ? "[IMPORTANT: Reply ENTIRELY in French — Répondez entièrement en français]"
+        ? "[IMPORTANT: Répondez entièrement en français]"
         : "[IMPORTANT: Reply ENTIRELY in English]";
 
-      const history = [...messages, userMsg].map(m => ({
-        role:    m.role,
-        content: m.content,
-      }));
-      // Prepend language instruction to the last user message
+      const history = [...messages, userMsg].map(m => ({ role:m.role, content:m.content }));
       history[history.length - 1].content = `${langInstruction}\n\n${content}`;
+
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
       const res = await fetch("/api/chat", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ messages: history, lang }),
+        signal:  controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setMessages(prev => [...prev, {
-        role:      "assistant",
-        content:   data.reply || (lang === "fr" ? "Désolé, je n'ai pas pu traiter cette demande." : "Sorry, I could not process that request."),
-        timestamp: new Date(),
-        lang,
+        role:"assistant",
+        content: data.reply || FALLBACK[lang],
+        timestamp: new Date(), lang,
       }]);
       if (!open) setUnread(u => u + 1);
 
     } catch {
+      // Step 3: API unavailable — use generic fallback (never show "contact kmn@dentons.com")
       setMessages(prev => [...prev, {
-        role:      "assistant",
-        content:   ui.offline,
-        timestamp: new Date(),
-        lang,
+        role:"assistant",
+        content: FALLBACK[lang],
+        timestamp: new Date(), lang,
       }]);
     }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, loading, messages, open, lang, ui]);
+  }, [input, loading, messages, open, lang]);
 
   const showQuickPrompts = messages.filter(m => m.role === "user").length === 0;
 
