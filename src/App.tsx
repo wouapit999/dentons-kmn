@@ -26,6 +26,7 @@ import type { Session } from "./services/authService";
 import { getNavItems } from "./services/permissionsService";
 import Logo from "./components/ui/Logo";
 import { useNotifications, AppNotification } from "./hooks/useNotifications";
+import { useSeedData } from "./hooks/useSeedData";
 
 const pageTitles: Record<string, string> = {
   dashboard:"nav.dashboard", matters:"nav.matters", clients:"nav.clients",
@@ -85,6 +86,8 @@ function AppInner() {
 
   const clearNotifs = useCallback(() => setAppNotifs([]), []);
 
+  // Seed Excel data on first login
+  useSeedData();
   // Wire up the notification system
   useNotifications(tasks, calendarEvents, session!.userId, i18n.language, handleNewNotif);
 
