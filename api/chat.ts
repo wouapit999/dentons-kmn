@@ -118,14 +118,49 @@ Provide accurate legal guidance with real references and links for:
 - Email: kmn@dentons.com
 - Practice areas: Corporate, Litigation, Employment, Real Estate, IP, Tax, Banking, Arbitration, Family, Criminal`;
 
+const ALLOWED_ORIGINS = [
+  "https://dentons-kmn.vercel.app",
+  "https://www.dentons-kmn.vercel.app",
+];
+
 export default async function handler(req: any, res: any) {
+  // ── CORS — restrict to trusted origins only ─────────────────────────────
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { messages, lang = "en" } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: "messages array required" });
+  // Reject suspicious query parameters (command injection probes)
+  const url = req.url || "";
+  if (/[?&](cmd|exec|command|run|shell|eval)=/i.test(url)) {
+    return res.status(400).json({ error: "Invalid request" });
+  }
+
+  const { messages, lang = "en" } = req.body || {};
+  if (!messages || !Array.isArray(messages) || messages.length > 50) {
+    return res.status(400).json({ error: "Invalid messages array" });
+  }
+
+  // Validate each message
+  for (const m of messages) {
+    if (!m || typeof m.role !== "string" || typeof m.content !== "string") {
+      return res.status(400).json({ error: "Invalid message format" });
+    }
+    if (m.content.length > 10000) {
+      return res.status(400).json({ error: "Message too long" });
+    }
   }
 
   // Append a language instruction to the system prompt

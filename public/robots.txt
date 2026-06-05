@@ -1,3 +1,15 @@
 # https://www.robotstxt.org/robotstxt.html
+# This is a private legal practice management system.
+# Public crawling and indexing is not permitted.
+
 User-agent: *
-Disallow:
+Disallow: /
+
+User-agent: Nikto
+Disallow: /
+User-agent: sqlmap
+Disallow: /
+User-agent: wpscan
+Disallow: /
+User-agent: nuclei
+Disallow: /
