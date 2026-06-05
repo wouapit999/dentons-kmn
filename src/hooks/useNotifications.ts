@@ -79,8 +79,9 @@ export function useNotifications(
     // ── Check TASKS ───────────────────────────────────────────────────────
     tasksRef.current.forEach(task => {
       if (task.status === "done" || task.status === "cancelled") return;
-      // Only notify the assigned user
-      if (task.assignedTo !== currentUserId) return;
+      // Notify all assignees (multi-user support)
+      const assignees = task.assignees?.length ? task.assignees : (task.assignedTo ? [task.assignedTo] : []);
+      if (!assignees.includes(currentUserId)) return;
       const due = new Date(task.dueDate + "T23:59:59");
 
       // 10-minute reminder (fire once when due is within 10 min from now)

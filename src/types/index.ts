@@ -128,7 +128,8 @@ export interface Task {
   matterId?: string;
   title: string;
   description?: string;
-  assignedTo: string;
+  assignedTo: string;        // primary assignee (kept for backward compat)
+  assignees: string[];       // all assignees (multi-user)
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: string;

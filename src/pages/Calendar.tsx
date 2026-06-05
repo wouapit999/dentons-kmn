@@ -1,11 +1,49 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Users } from "lucide-react";
+import { useApp } from "../context/AppContext";
 import { useData } from "../context/DataContext";
 import { CalendarEvent } from "../types";
 
+// Reuse multi-user selector (inline version)
+function AttendeeSelector({ selected, onChange, users, label }: { selected:string[]; onChange:(ids:string[])=>void; users:any[]; label:string }) {
+  const [open, setOpen] = useState(false);
+  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(s=>s!==id) : [...selected,id]);
+  const selectedUsers = users.filter(u => selected.includes(u.id));
+  return (
+    <div style={{ position:"relative" }}>
+      <div onClick={()=>setOpen(!open)} style={{ border:"1.5px solid var(--gray-300)", borderRadius:"var(--radius)", padding:"8px 12px", cursor:"pointer", background:"white", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", minHeight:40 }}>
+        {selectedUsers.length===0
+          ? <span style={{ color:"var(--gray-400)", fontSize:14 }}>— {label} —</span>
+          : selectedUsers.map(u=>(
+            <span key={u.id} style={{ background:"var(--navy)", color:"white", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:600, display:"inline-flex", alignItems:"center", gap:5 }}>
+              {u.firstName[0]}{u.lastName?.[0]||""} <span style={{opacity:0.7}}>{u.firstName}</span>
+              <button onClick={e=>{e.stopPropagation();toggle(u.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"white",padding:0,lineHeight:1}}>×</button>
+            </span>
+          ))}
+        <span style={{marginLeft:"auto",color:"var(--gray-400)",fontSize:12}}>▾</span>
+      </div>
+      {open && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"white", border:"1px solid var(--gray-200)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", zIndex:200, maxHeight:200, overflowY:"auto" }}>
+          {users.filter(u=>u.active&&u.role!=="client").map(u=>(
+            <div key={u.id} onClick={()=>toggle(u.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", cursor:"pointer", background:selected.includes(u.id)?"var(--gold-pale)":"white", borderBottom:"1px solid var(--gray-100)" }}>
+              <div style={{ width:28,height:28,borderRadius:"50%",background:selected.includes(u.id)?"var(--gold)":"var(--navy)",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0 }}>
+                {u.firstName[0]}{u.lastName?.[0]||""}
+              </div>
+              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:"var(--navy)"}}>{u.firstName} {u.lastName}</div><div style={{fontSize:11,color:"var(--gray-500)"}}>{u.role}</div></div>
+              {selected.includes(u.id)&&<span style={{color:"var(--gold-dark)",fontWeight:700}}>✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {open&&<div style={{position:"fixed",inset:0,zIndex:199}} onClick={()=>setOpen(false)}/>}
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const { t, i18n } = useTranslation();
+  const { users } = useApp();
   const isFr = i18n.language === "fr";
   const { calendarEvents, setCalendarEvents, matters } = useData();
 
@@ -162,6 +200,24 @@ export default function CalendarPage() {
                     {matters.map(m=><option key={m.id} value={m.id}>{m.matterId} – {m.title}</option>)}
                   </select>
                 </div>
+              </div>
+              {/* Multi-user attendees */}
+              <div className="form-group">
+                <label className="form-label" style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <Users size={13}/>{t("calendar.attendees")}
+                  <span style={{ fontSize:11, color:"var(--gray-400)", fontWeight:400 }}>— all will receive a reminder notification</span>
+                </label>
+                <AttendeeSelector
+                  selected={form.attendees||[]}
+                  onChange={ids=>setForm(f=>({...f,attendees:ids}))}
+                  users={users.filter(u=>u.active)}
+                  label={t("calendar.attendees")}
+                />
+                {(form.attendees?.length||0)>0&&(
+                  <div className="form-hint" style={{color:"var(--info)"}}>
+                    ℹ️ {form.attendees!.length} {form.attendees!.length===1?"person":"people"} will be notified 10 minutes before this event.
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
