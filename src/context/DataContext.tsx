@@ -10,58 +10,87 @@ import {
   Payment, Expense, Retainer
 } from "../types";
 
-// ── Write one item to Firestore (background, never throws) ────────────────
-function saveToFirestore(col: string, item: any) {
+const LS_PREFIX = "dkmn_data_";
+
+// ── localStorage helpers ───────────────────────────────────────────────────
+function lsLoad<T>(col: string): T[] {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + col);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function lsSave<T>(col: string, data: T[]) {
+  try { localStorage.setItem(LS_PREFIX + col, JSON.stringify(data)); } catch {}
+}
+
+// ── Write one item to Firestore + localStorage ─────────────────────────────
+function saveItem(col: string, item: any, allItems: any[]) {
+  // Always save to localStorage first (instant, always works)
+  lsSave(col, allItems);
+  // Then try Firestore in background
   try {
     const { id, ...data } = item;
-    setDoc(doc(db, col, id), data, { merge: true }).catch(() => {});
+    setDoc(doc(db, col, id), { ...data, _updatedAt: new Date().toISOString() }, { merge: true })
+      .catch(() => {}); // silently ignore if offline
   } catch {}
 }
 
-// ── Generic collection state with Firestore real-time sync ────────────────
+// ── Generic collection state — localStorage + Firestore ───────────────────
 function useCollectionState<T extends { id: string }>(col: string) {
-  const [items, setItems]     = useState<T[]>([]);
-  const itemsRef              = useRef<T[]>([]);
-  const lastLocalWriteRef     = useRef<number>(0); // timestamp of last local write
+  // Initialise from localStorage immediately (no flicker, instant load)
+  const [items, setItems]     = useState<T[]>(() => lsLoad<T>(col));
+  const itemsRef              = useRef<T[]>(lsLoad<T>(col));
+  const lastLocalWriteRef     = useRef<number>(0);
 
-  // Keep ref in sync with state
+  // Keep ref in sync
   useEffect(() => { itemsRef.current = items; }, [items]);
 
-  // Subscribe to Firestore — but SKIP snapshot if a local write just happened
-  // (prevents Firestore overwriting fresh local state before write propagates)
+  // Subscribe to Firestore for real-time cross-device sync
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, col),
       snap => {
-        const msSinceLocalWrite = Date.now() - lastLocalWriteRef.current;
-        if (msSinceLocalWrite < 3000) return; // ignore snapshot for 3s after local write
-        setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as T)));
+        // Skip Firestore snapshot for 3s after a local write (avoid overwrite)
+        if (Date.now() - lastLocalWriteRef.current < 3000) return;
+        if (snap.docs.length === 0 && itemsRef.current.length > 0) {
+          // Firestore is empty but we have local data → re-seed Firestore
+          itemsRef.current.forEach(item => {
+            try {
+              const { id, ...data } = item as any;
+              setDoc(doc(db, col, id), { ...data, _seeded: true }, { merge: true }).catch(() => {});
+            } catch {}
+          });
+          return;
+        }
+        if (snap.docs.length > 0) {
+          const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() } as T));
+          setItems(fresh);
+          itemsRef.current = fresh;
+          lsSave(col, fresh); // keep localStorage in sync with Firestore
+        }
       },
-      () => {} // offline — keep local state as-is
+      () => {} // offline — keep local state unchanged
     );
     return unsub;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [col]);
 
-  // Setter: updates local state IMMEDIATELY, then writes to Firestore in background
+  // Setter: instant UI + localStorage, then Firestore in background
   const setter = useCallback((value: T[] | ((prev: T[]) => T[])) => {
     const prev = itemsRef.current;
     const next = typeof value === "function" ? value(prev) : value;
 
-    // Mark local write time (suppresses Firestore snapshot for 3s)
     lastLocalWriteRef.current = Date.now();
-
-    // 1. Update UI instantly — guaranteed, no network needed
     setItems(next);
     itemsRef.current = next;
+    lsSave(col, next); // persist locally immediately
 
-    // 2. Write new/changed items to Firestore in background
+    // Find new/changed items and write to Firestore
     next.forEach(item => {
       const existing  = prev.find(p => p.id === item.id);
       const isNew     = !existing;
       const isChanged = existing && JSON.stringify(existing) !== JSON.stringify(item);
-      if (isNew || isChanged) {
-        saveToFirestore(col, item);
-      }
+      if (isNew || isChanged) saveItem(col, item, next);
     });
   }, [col]);
 
@@ -121,27 +150,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [expenses,          setExpenses]          = useCollectionState<Expense>(COLLECTIONS.EXPENSES);
   const [retainers,         setRetainers]         = useCollectionState<Retainer>(COLLECTIONS.RETAINERS);
 
-  const loading = false; // UI never blocks on loading
+  const loading = false;
 
-  const addAuditLog = useCallback((
-    action: string, entityType: string, entityId: string,
-    details?: string, userId?: string
-  ) => {
-    fsAddDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
-      userId: userId || "system", action, entityType, entityId,
-      timestamp: new Date().toISOString(), ipAddress: "—",
-      details: details || "",
-    }).catch(() => {});
-  }, []);
-
-  // Keep addDoc_ and updateDoc_ for components that use them directly
-  const addDoc_    = useCallback(async (col: string, data: any): Promise<string> => {
+  const addDoc_ = useCallback(async (col: string, data: any): Promise<string> => {
     const ref = await fsAddDoc(collection(db, col), { ...data, _createdAt: new Date().toISOString() });
     return ref.id;
   }, []);
 
   const updateDoc_ = useCallback(async (col: string, id: string, data: any): Promise<void> => {
-    saveToFirestore(col, { id, ...data });
+    try {
+      setDoc(doc(db, col, id), { ...data, _updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch {}
   }, []);
 
   const deleteDoc_ = useCallback(async (col: string, id: string): Promise<void> => {
@@ -149,6 +168,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const { deleteDoc: fsDeleteDoc } = await import("firebase/firestore");
       await fsDeleteDoc(doc(db, col, id));
     } catch {}
+  }, []);
+
+  const addAuditLog = useCallback((
+    action: string, entityType: string, entityId: string,
+    details?: string, userId?: string
+  ) => {
+    fsAddDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
+      userId: userId || "system", action, entityType, entityId,
+      timestamp: new Date().toISOString(), ipAddress: "—", details: details || "",
+    }).catch(() => {});
   }, []);
 
   return (
