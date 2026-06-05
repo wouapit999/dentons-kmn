@@ -1,4 +1,4 @@
-import { doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { db, COLLECTIONS } from "../config/firebase";
 import { UserRole } from "../types";
 
@@ -45,7 +45,10 @@ export const INITIAL_USERS: Array<{
   { id:"u17", firstName:"Roland",     lastName:"Wouapit",    email:"roland.wouapit@dentons.com",    role:"admin",           billingRate:0,     department:"IT",          password:"4133648" },
 ];
 
-// ── LOGIN — always instant, never waits for network ────────────────────────
+// ── LOGIN ─────────────────────────────────────────────────────────────────
+// Priority:
+//   1. Firestore (has latest passwords set by admin)
+//   2. Hardcoded list fallback (works offline, uses original passwords)
 export async function login(
   email: string,
   password: string
@@ -54,18 +57,68 @@ export async function login(
   const e = email.trim().toLowerCase();
   const p = password.trim();
 
-  // Step 1: Find user in hardcoded list (INSTANT — no network)
+  // ── Step 1: Try Firestore first (5-second timeout) ──────────────────────
+  try {
+    const q    = query(collection(db, COLLECTIONS.USERS), where("email", "==", e));
+    const snap = await Promise.race([
+      getDocs(q),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+    ]) as Awaited<ReturnType<typeof getDocs>>;
+
+    if (!snap.empty) {
+      const userDoc  = snap.docs[0];
+      const userData = userDoc.data() as Record<string, any>;
+
+      if (!userData.active) {
+        return { success: false, error: "Account is deactivated. Contact the Administrator." };
+      }
+
+      // Check hashed password (set by admin via change-password)
+      if (userData.passwordHash) {
+        const inputHash = await hashPwd(p);
+        if (inputHash !== userData.passwordHash) {
+          return { success: false, error: "Incorrect password. Please try again." };
+        }
+      } else {
+        // No hash in Firestore yet — check against hardcoded plain-text fallback
+        const localUser = INITIAL_USERS.find(u => u.email.toLowerCase() === e);
+        if (!localUser || localUser.password !== p) {
+          return { success: false, error: "Incorrect password. Please try again." };
+        }
+        // Store the hash now for future logins
+        const hash = await hashPwd(p);
+        updateDoc(doc(db, COLLECTIONS.USERS, userDoc.id), { passwordHash: hash }).catch(() => {});
+      }
+
+      // Update lastLogin
+      updateDoc(doc(db, COLLECTIONS.USERS, userDoc.id), {
+        lastLogin: new Date().toISOString(),
+      }).catch(() => {});
+
+      const session: Session = {
+        userId: userDoc.id,
+        email:  userData.email,
+        role:   userData.role as UserRole,
+        name:   `${userData.firstName} ${userData.lastName || ""}`.trim(),
+      };
+      setSession(session);
+      return { success: true, session };
+    }
+    // User not in Firestore yet — fall through to hardcoded list
+  } catch {
+    // Firestore unavailable — fall through to hardcoded list
+  }
+
+  // ── Step 2: Hardcoded fallback (offline / first time before sync) ────────
   const localUser = INITIAL_USERS.find(u => u.email.toLowerCase() === e);
   if (!localUser) {
     return { success: false, error: "Email address not found. Please check and try again." };
   }
 
-  // Step 2: Check password against hardcoded list (INSTANT — no network)
   if (localUser.password !== p) {
     return { success: false, error: "Incorrect password. Please try again." };
   }
 
-  // Step 3: User is valid — create session immediately
   const session: Session = {
     userId: localUser.id,
     email:  localUser.email,
@@ -74,7 +127,7 @@ export async function login(
   };
   setSession(session);
 
-  // Step 4: Sync to Firebase in background (non-blocking)
+  // Sync to Firebase in background
   syncToFirebase(localUser).catch(() => {});
 
   return { success: true, session };
