@@ -28,7 +28,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+          "value": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
         },
         {
           "key": "X-XSS-Protection",
@@ -43,8 +43,16 @@
           "value": "same-origin"
         },
         {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "credentialless"
+        },
+        {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://api.emailjs.com https://api.anthropic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     },
@@ -69,62 +77,5 @@
         }
       ]
     }
-  ],
-
-  "redirects": [
-    { "source": "/wp-admin/:path*",      "destination": "/",     "permanent": false },
-    { "source": "/wp-login.php",          "destination": "/",     "permanent": false },
-    { "source": "/wp-config.php",         "destination": "/404",  "permanent": false },
-    { "source": "/adminer.php",           "destination": "/404",  "permanent": false },
-    { "source": "/adminer",               "destination": "/404",  "permanent": false },
-    { "source": "/config.php",            "destination": "/404",  "permanent": false },
-    { "source": "/configuration.php",     "destination": "/404",  "permanent": false },
-    { "source": "/config.xml",            "destination": "/404",  "permanent": false },
-    { "source": "/web.config",            "destination": "/404",  "permanent": false },
-    { "source": "/backup.sql",            "destination": "/404",  "permanent": false },
-    { "source": "/db_backup.sql",         "destination": "/404",  "permanent": false },
-    { "source": "/dump.sql",              "destination": "/404",  "permanent": false },
-    { "source": "/database.sql",          "destination": "/404",  "permanent": false },
-    { "source": "/actuator/:path*",       "destination": "/404",  "permanent": false },
-    { "source": "/debug",                 "destination": "/404",  "permanent": false },
-    { "source": "/shell.php",             "destination": "/404",  "permanent": false },
-    { "source": "/cmd.php",               "destination": "/404",  "permanent": false },
-    { "source": "/webshell.php",          "destination": "/404",  "permanent": false },
-    { "source": "/backdoor.php",          "destination": "/404",  "permanent": false },
-    { "source": "/c99.php",               "destination": "/404",  "permanent": false },
-    { "source": "/r57.php",               "destination": "/404",  "permanent": false },
-    { "source": "/upload.php",            "destination": "/404",  "permanent": false },
-    { "source": "/file_manager.php",      "destination": "/404",  "permanent": false },
-    { "source": "/manager.php",           "destination": "/404",  "permanent": false },
-    { "source": "/filemanager",           "destination": "/404",  "permanent": false },
-    { "source": "/db.php",                "destination": "/404",  "permanent": false },
-    { "source": "/database.php",          "destination": "/404",  "permanent": false },
-    { "source": "/sql.php",               "destination": "/404",  "permanent": false },
-    { "source": "/passwd",                "destination": "/404",  "permanent": false },
-    { "source": "/shadow",                "destination": "/404",  "permanent": false },
-    { "source": "/id_rsa",                "destination": "/404",  "permanent": false },
-    { "source": "/id_dsa",                "destination": "/404",  "permanent": false },
-    { "source": "/.bash_history",         "destination": "/404",  "permanent": false },
-    { "source": "/.ssh/:path*",           "destination": "/404",  "permanent": false },
-    { "source": "/.aws/:path*",           "destination": "/404",  "permanent": false },
-    { "source": "/settings.php",          "destination": "/404",  "permanent": false },
-    { "source": "/local.xml",             "destination": "/404",  "permanent": false },
-    { "source": "/appsettings.json",      "destination": "/404",  "permanent": false },
-    { "source": "/aws.json",              "destination": "/404",  "permanent": false },
-    { "source": "/credentials",           "destination": "/404",  "permanent": false },
-    { "source": "/google-services.json",  "destination": "/404",  "permanent": false },
-    { "source": "/graphql",               "destination": "/404",  "permanent": false },
-    { "source": "/graphiql",              "destination": "/404",  "permanent": false },
-    { "source": "/_graphql",              "destination": "/404",  "permanent": false },
-    { "source": "/console",               "destination": "/404",  "permanent": false },
-    { "source": "/rails/info/properties", "destination": "/404",  "permanent": false },
-    { "source": "/telescope",             "destination": "/404",  "permanent": false },
-    { "source": "/horizon",               "destination": "/404",  "permanent": false },
-    { "source": "/_profiler",             "destination": "/404",  "permanent": false },
-    { "source": "/_wdt",                  "destination": "/404",  "permanent": false },
-    { "source": "/trace",                 "destination": "/404",  "permanent": false },
-    { "source": "/metrics",               "destination": "/404",  "permanent": false },
-    { "source": "/health",                "destination": "/404",  "permanent": false },
-    { "source": "/env",                   "destination": "/404",  "permanent": false }
   ]
 }
