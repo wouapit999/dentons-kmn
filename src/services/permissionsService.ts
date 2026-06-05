@@ -1,6 +1,5 @@
 import { UserRole } from "../types";
 
-// Defines what each role can do
 export type Permission =
   | "matters:read" | "matters:write"
   | "clients:read" | "clients:write"
@@ -12,33 +11,38 @@ export type Permission =
   | "reports:read"
   | "users:read" | "users:write"
   | "settings:write"
-  | "audit:read";
+  | "audit:read"
+  | "expenses:submit" | "expenses:approve";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   managingPartner: [
     "matters:read","matters:write","clients:read","clients:write",
     "documents:read","documents:write","tasks:read","tasks:write",
     "time:read","time:write","billing:read","billing:write",
-    "trust:read","trust:write","reports:read","users:read","audit:read","settings:write",
+    "trust:read","trust:write","reports:read","users:read",
+    "expenses:submit","expenses:approve",
+    // Settings & audit restricted to Admin + Finance only
   ],
   partner: [
     "matters:read","matters:write","clients:read","clients:write",
     "documents:read","documents:write","tasks:read","tasks:write",
     "time:read","time:write","billing:read","billing:write",
-    "trust:read","reports:read","audit:read",
+    "trust:read","reports:read","expenses:submit",
   ],
   associate: [
     "matters:read","matters:write","clients:read","clients:write",
     "documents:read","documents:write","tasks:read","tasks:write",
-    "time:read","time:write","reports:read",
+    "time:read","time:write","reports:read","expenses:submit",
   ],
   paralegal: [
     "matters:read","clients:read","documents:read","documents:write",
-    "tasks:read","tasks:write","time:read","time:write",
+    "tasks:read","tasks:write","time:read","time:write","expenses:submit",
   ],
   finance: [
     "time:read","billing:read","billing:write",
     "trust:read","trust:write","reports:read",
+    "audit:read","settings:write",          // Finance sees audit + settings
+    "expenses:submit","expenses:approve",   // Finance approves expenses
   ],
   admin: [
     "matters:read","matters:write","clients:read","clients:write",
@@ -46,6 +50,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "time:read","time:write","billing:read","billing:write",
     "trust:read","trust:write","reports:read","users:read","users:write",
     "settings:write","audit:read",
+    "expenses:submit","expenses:approve",
   ],
   client: ["matters:read","documents:read","billing:read"],
 };
@@ -66,7 +71,11 @@ export function getNavItems(role: UserRole): string[] {
   if (can(role,"trust:read"))     nav.push("trust");
   if (can(role,"reports:read"))   nav.push("reports");
   if (can(role,"users:read"))     nav.push("users");
+  // Audit Log: Admin + Finance only
+  // Expenses: everyone with expenses:submit
+  if (can(role,"expenses:submit")) nav.push("expenses");
   if (can(role,"audit:read"))     nav.push("audit");
-  nav.push("settings");
+  // Settings: Admin + Finance only
+  if (can(role,"settings:write")) nav.push("settings");
   return nav;
 }

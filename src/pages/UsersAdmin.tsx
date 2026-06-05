@@ -8,8 +8,9 @@ import {
 import { User, UserRole } from "../types";
 import { useApp } from "../context/AppContext";
 import { doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { useEffect } from "react";
 import { db, COLLECTIONS } from "../config/firebase";
-import { hashPwd } from "../services/authService";
+import { changePassword, hashPwd, savePasswordOverride, getLoginActivity, LoginRecord } from "../services/authService";
 import { exportToExcel, exportToPDF } from "../utils/exportUtils";
 
 const fmt = (n: number) => n > 0
@@ -61,6 +62,11 @@ export default function UsersAdmin() {
   const [addErrors,   setAddErrors]   = useState<Record<string, string>>({});
   const [statusMsg,   setStatusMsg]   = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
   const [saving,      setSaving]      = useState(false);
+  const [loginActivity, setLoginActivity] = useState<LoginRecord[]>([]);
+
+  useEffect(() => {
+    if (activeTab === "logins") setLoginActivity(getLoginActivity());
+  }, [activeTab]);
 
   const toast = (type: "success" | "error" | "info", msg: string) => {
     setStatusMsg({ type, msg });
@@ -94,12 +100,16 @@ export default function UsersAdmin() {
     if (!pwdModal || !newPwd || newPwd.length < 6) { toast("error", isFr ? "Min. 6 caractères." : "Min. 6 characters."); return; }
     if (newPwd !== confirmPwd) { toast("error", isFr ? "Mots de passe différents." : "Passwords don't match."); return; }
     setSaving(true);
-    try {
-      const hash = await hashPwd(newPwd);
-      await updateDoc(doc(db, COLLECTIONS.USERS, pwdModal.id), { passwordHash: hash, forcePasswordChange: false });
-      toast("success", isFr ? `Mot de passe changé pour ${pwdModal.firstName}.` : `Password changed for ${pwdModal.firstName}.`);
+    // changePassword updates BOTH Firestore and localStorage override
+    const ok = await changePassword(pwdModal.id, pwdModal.email, newPwd.trim());
+    if (ok) {
+      toast("success", isFr
+        ? `✅ Mot de passe changé pour ${pwdModal.firstName}. Il peut se connecter immédiatement.`
+        : `✅ Password changed for ${pwdModal.firstName}. They can log in immediately.`);
       setPwdModal(null); setNewPwd(""); setConfirmPwd("");
-    } catch { toast("error", isFr ? "Échec." : "Failed."); }
+    } else {
+      toast("error", isFr ? "Échec — vérifiez la connexion Firebase." : "Failed — check Firebase connection.");
+    }
     setSaving(false);
   };
 
@@ -143,8 +153,10 @@ export default function UsersAdmin() {
     setSaving(true);
     try {
       await setDoc(doc(db, COLLECTIONS.USERS, newId), { ...nu, passwordHash: hash, forcePasswordChange: true });
+      // Save override so new user can log in immediately even before Firestore sync
+      savePasswordOverride(nu.email, hash);
       setUsers(prev => [...prev, nu]);
-      toast("success", isFr ? `${nu.firstName} ajouté(e). Mot de passe : ${pwd}` : `${nu.firstName} added. Password: ${pwd}`);
+      toast("success", isFr ? `✅ ${nu.firstName} ajouté(e). Mot de passe : ${pwd}` : `✅ ${nu.firstName} added. Password: ${pwd}`);
       setAddModal(false); setAddForm({ role: "associate", active: true, billingRate: 0 });
     } catch { toast("error", isFr ? "Ajout échoué." : "Failed."); }
     setSaving(false);
@@ -351,27 +363,54 @@ export default function UsersAdmin() {
 
       {/* ── LOGIN ACTIVITY ── */}
       {activeTab === "logins" && isAdmin && (
-        <div className="card">
-          <div className="card-header"><span className="card-title">{isFr ? "Activité de Connexion" : "Login Activity"}</span></div>
-          <div className="table-container">
-            <table>
-              <thead><tr><th>{t("common.name")}</th><th>{t("common.email")}</th><th>{t("users.role")}</th><th>{t("users.lastLogin")}</th><th>{t("common.status")}</th></tr></thead>
-              <tbody>
-                {[...users].sort((a, b) => { const al = typeof a.lastLogin === "string" ? a.lastLogin : ""; const bl = typeof b.lastLogin === "string" ? b.lastLogin : ""; return bl.localeCompare(al); }).map(u => (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 500 }}>{u.firstName} {u.lastName}</td>
-                    <td style={{ fontSize: 12, color: "var(--gray-600)" }}>{u.email}</td>
-                    <td><span className={`badge ${ROLE_COLORS[u.role] || "badge-gray"}`}>{t(`users.roles.${u.role}`)}</span></td>
-                    <td style={{ fontSize: 12 }}>
-                      {typeof u.lastLogin === "string"
-                        ? <div style={{ display: "flex", alignItems: "center", gap: 5 }}><Clock size={12} color="var(--success)" />{u.lastLogin.split("T")[0]} {u.lastLogin.split("T")[1]?.slice(0, 5)}</div>
-                        : <span style={{ color: "var(--gray-400)", fontStyle: "italic" }}>{isFr ? "Jamais connecté" : "Never"}</span>}
-                    </td>
-                    <td><span className={`badge ${u.active ? "badge-green" : "badge-gray"}`}>{u.active ? t("common.active") : t("common.inactive")}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-header">
+              <span className="card-title">{isFr ? "Historique des Connexions (temps réel)" : "Live Login History"}</span>
+              <span style={{ fontSize: 12, color: "var(--gray-500)" }}>{loginActivity.length} {isFr ? "connexions enregistrées" : "recorded logins"}</span>
+            </div>
+            <div className="table-container">
+              <table>
+                <thead><tr><th>{t("common.name")}</th><th>{t("common.email")}</th><th>{isFr?"Date":"Date"}</th><th>{isFr?"Heure":"Time"}</th></tr></thead>
+                <tbody>
+                  {loginActivity.length === 0
+                    ? <tr><td colSpan={4}><div className="empty-state"><div className="empty-state-text">{isFr?"Aucune connexion enregistrée encore":"No logins recorded yet — logins are tracked after this fix is deployed"}</div></div></td></tr>
+                    : loginActivity.map((rec, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 500 }}>{rec.name}</td>
+                        <td style={{ fontSize: 12, color: "var(--gray-600)" }}>{rec.email}</td>
+                        <td style={{ fontSize: 12 }}><div style={{ display:"flex", alignItems:"center", gap:5 }}><Clock size={12} color="var(--success)"/>{rec.at.split("T")[0]}</div></td>
+                        <td style={{ fontSize: 12, color: "var(--gray-500)" }}>{rec.at.split("T")[1]?.slice(0,5)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Also show last known login per user */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">{isFr?"Dernière connexion par utilisateur":"Last Login per User"}</span></div>
+            <div className="table-container">
+              <table>
+                <thead><tr><th>{t("common.name")}</th><th>{t("common.email")}</th><th>{t("users.role")}</th><th>{t("users.lastLogin")}</th><th>{t("common.status")}</th></tr></thead>
+                <tbody>
+                  {[...users].sort((a,b)=>{const al=typeof a.lastLogin==="string"?a.lastLogin:"";const bl=typeof b.lastLogin==="string"?b.lastLogin:"";return bl.localeCompare(al);}).map(u=>(
+                    <tr key={u.id}>
+                      <td style={{fontWeight:500}}>{u.firstName} {u.lastName}</td>
+                      <td style={{fontSize:12,color:"var(--gray-600)"}}>{u.email}</td>
+                      <td><span className={`badge ${ROLE_COLORS[u.role]||"badge-gray"}`}>{t(`users.roles.${u.role}`)}</span></td>
+                      <td style={{fontSize:12}}>
+                        {typeof u.lastLogin==="string"
+                          ?<div style={{display:"flex",alignItems:"center",gap:5}}><Clock size={12} color="var(--success)"/>{u.lastLogin.split("T")[0]}</div>
+                          :<span style={{color:"var(--gray-400)",fontStyle:"italic"}}>{isFr?"Jamais":"Never"}</span>}
+                      </td>
+                      <td><span className={`badge ${u.active?"badge-green":"badge-gray"}`}>{u.active?t("common.active"):t("common.inactive")}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

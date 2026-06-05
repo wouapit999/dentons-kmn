@@ -18,6 +18,7 @@ import Billing from "./pages/Billing";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
+import Expenses from "./pages/Expenses";
 import ChatBot from "./components/ui/ChatBot";
 import AuditLog from "./pages/AuditLog";
 import Trust from "./pages/Trust";
@@ -33,6 +34,7 @@ const pageTitles: Record<string, string> = {
   documents:"nav.documents", tasks:"nav.tasks", calendar:"nav.calendar",
   time:"nav.timeTracking", billing:"nav.billing", reports:"nav.reports",
   settings:"nav.settings", users:"nav.users", audit:"nav.auditLog", trust:"trust.title",
+  expenses:"nav.expenses",
 };
 
 function LoadingScreen({ message }: { message: string }) {
@@ -102,6 +104,7 @@ function AppInner() {
       case "calendar":  return <CalendarPage/>;
       case "time":      return <TimeTracking/>;
       case "billing":   return <Billing/>;
+      case "expenses":  return <Expenses/>;
       case "reports":   return <Reports/>;
       case "settings":  return <Settings/>;
       case "users":     return role==="admin"||role==="managingPartner" ? <Users/> : <AccessDenied/>;

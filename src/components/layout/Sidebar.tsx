@@ -20,6 +20,7 @@ const ALL_NAV = [
   { key:"time",      icon:Clock,           label:"nav.timeTracking",section:"billing" },
   { key:"billing",   icon:Receipt,         label:"nav.billing",     section:"billing" },
   { key:"trust",     icon:Scale,           label:"trust.title",     section:"billing" },
+  { key:"expenses",  icon:Receipt,         label:"nav.expenses",    section:"billing" },
   { key:"reports",   icon:BarChart2,       label:"nav.reports",     section:"manage" },
   { key:"users",     icon:UserCog,         label:"nav.users",       section:"manage" },
   { key:"audit",     icon:Shield,          label:"nav.auditLog",    section:"manage" },

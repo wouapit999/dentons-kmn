@@ -130,6 +130,7 @@ export interface Task {
   description?: string;
   assignedTo: string;        // primary assignee (kept for backward compat)
   assignees: string[];       // all assignees (multi-user)
+  createdBy?: string;        // user who created the task (gets status notifications)
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: string;
@@ -206,20 +207,28 @@ export type ExpenseCategory =
   | "court_fees" | "travel" | "printing" | "postage" | "filing"
   | "expert_fees" | "translation" | "meals" | "accommodation" | "office" | "other";
 
+export type ExpenseStatus = "pending" | "approved" | "rejected" | "billed";
+
 export interface Expense {
   id: string;
   matterId?: string;
   clientId?: string;
-  userId: string;
+  userId: string;          // submitter
+  approvedBy?: string;     // finance/admin who approved/rejected
   date: string;
+  submittedAt?: string;
+  approvedAt?: string;
   category: ExpenseCategory;
   description: string;
+  justification?: string;  // reason for the expense
   amount: number;
   currency: string;
   billable: boolean;
   billed: boolean;
   receipt?: string;
-  approved: boolean;
+  approved: boolean;       // legacy field
+  status: ExpenseStatus;   // pending | approved | rejected | billed
+  rejectionReason?: string;
 }
 
 export interface Retainer {

@@ -186,6 +186,7 @@ export default function Tasks() {
         priority:    (form.priority || "medium") as TaskPriority,
         dueDate:     form.dueDate!,
         createdAt:   new Date().toISOString(),
+        createdBy:   session?.userId,
         matterId:    form.matterId,
         description: form.description,
       };

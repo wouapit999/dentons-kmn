@@ -12,6 +12,7 @@ const fr = {
       calendar: "Calendrier",
       timeTracking: "Suivi du Temps",
       billing: "Facturation",
+      expenses: "Dépenses",
       reports: "Rapports",
       settings: "Paramètres",
       users: "Utilisateurs",

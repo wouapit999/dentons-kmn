@@ -14,6 +14,7 @@ const en = {
       calendar: "Calendar",
       timeTracking: "Time Tracking",
       billing: "Billing",
+      expenses: "Expenses",
       reports: "Reports",
       settings: "Settings",
       users: "Users",

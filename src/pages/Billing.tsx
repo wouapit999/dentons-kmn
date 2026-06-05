@@ -192,7 +192,7 @@ export default function Billing() {
       category: expForm.category as ExpenseCategory || "other",
       description: expForm.description!,
       amount: expForm.amount!, currency: expForm.currency||"XAF",
-      billable: expForm.billable !== false, billed: false, approved: false,
+      billable: expForm.billable !== false, billed: false, approved: false, status: "pending",
     }, ...prev]);
     setShowExpenseModal(false);
     setExpForm({ date:new Date().toISOString().split("T")[0], billable:true, approved:false, currency:"XAF", category:"other" });

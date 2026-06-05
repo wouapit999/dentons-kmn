@@ -78,10 +78,29 @@ export function useNotifications(
 
     // ── Check TASKS ───────────────────────────────────────────────────────
     tasksRef.current.forEach(task => {
-      if (task.status === "done" || task.status === "cancelled") return;
-      // Notify all assignees (multi-user support)
+      // Notify assignees AND the creator (assigner)
       const assignees = task.assignees?.length ? task.assignees : (task.assignedTo ? [task.assignedTo] : []);
-      if (!assignees.includes(currentUserId)) return;
+      const isAssignee = assignees.includes(currentUserId);
+      const isCreator  = task.createdBy === currentUserId;
+      if (!isAssignee && !isCreator) return;
+
+      if (task.status === "done") {
+        // Notify creator that task was completed
+        if (isCreator && !isAssignee) {
+          const doneKey = `done_task_${task.id}_creator`;
+          if (!sent.has(doneKey)) {
+            const title = isFr() ? "✅ Tâche Terminée" : "✅ Task Completed";
+            const body  = isFr()
+              ? `La tâche "${task.title}" a été marquée comme terminée`
+              : `Task "${task.title}" has been marked as completed`;
+            fireBrowserNotif(title, body);
+            markSent(doneKey);
+            onNewNotif({ id:doneKey, type:"reminder", title, body, entityId:task.id, entityType:"task", at:new Date(), read:false });
+          }
+        }
+        return;
+      }
+      if (task.status === "cancelled") return;
       const due = new Date(task.dueDate + "T23:59:59");
 
       // 10-minute reminder (fire once when due is within 10 min from now)
