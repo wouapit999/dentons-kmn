@@ -23,16 +23,76 @@ function lsSave<T>(col: string, data: T[]) {
   try { localStorage.setItem(LS_PREFIX + col, JSON.stringify(data)); } catch {}
 }
 
+// ── Retry queue for failed Firestore writes ──────────────────────────────
+const RETRY_KEY = "dkmn_retry_queue";
+interface RetryEntry { col: string; id: string; data: any; attempts: number; }
+
+function loadRetryQueue(): RetryEntry[] {
+  try { return JSON.parse(localStorage.getItem(RETRY_KEY) || "[]"); } catch { return []; }
+}
+function saveRetryQueue(q: RetryEntry[]) {
+  try { localStorage.setItem(RETRY_KEY, JSON.stringify(q)); } catch {}
+}
+function enqueueRetry(col: string, id: string, data: any) {
+  const q = loadRetryQueue();
+  const idx = q.findIndex(e => e.col === col && e.id === id);
+  if (idx >= 0) { q[idx] = { col, id, data, attempts: q[idx].attempts }; }
+  else { q.push({ col, id, data, attempts: 0 }); }
+  saveRetryQueue(q);
+}
+
+// Process retry queue periodically
+let _retryTimer: ReturnType<typeof setInterval> | null = null;
+function startRetryProcessor() {
+  if (_retryTimer) return;
+  _retryTimer = setInterval(async () => {
+    const q = loadRetryQueue();
+    if (q.length === 0) return;
+    const remaining: RetryEntry[] = [];
+    for (const entry of q) {
+      try {
+        await setDoc(doc(db, entry.col, entry.id), { ...entry.data, _updatedAt: new Date().toISOString() }, { merge: true });
+      } catch {
+        if (entry.attempts < 10) remaining.push({ ...entry, attempts: entry.attempts + 1 });
+      }
+    }
+    saveRetryQueue(remaining);
+  }, 15000);
+}
+startRetryProcessor();
+
+// ── Sync warning state ───────────────────────────────────────────────────
+let _syncWarningShown = false;
+function showSyncWarning() {
+  if (_syncWarningShown) return;
+  _syncWarningShown = true;
+  const el = document.createElement("div");
+  el.id = "dkmn-sync-warning";
+  el.style.cssText = "position:fixed;top:0;left:0;right:0;background:#d32f2f;color:#fff;padding:8px 16px;text-align:center;z-index:99999;font-size:14px;";
+  el.textContent = "⚠ Some changes failed to sync to the cloud. They are saved locally and will retry automatically.";
+  const close = document.createElement("button");
+  close.textContent = "✕";
+  close.style.cssText = "background:none;border:none;color:#fff;font-size:18px;cursor:pointer;margin-left:16px;";
+  close.onclick = () => { el.remove(); _syncWarningShown = false; };
+  el.appendChild(close);
+  document.body.appendChild(el);
+}
+
 // ── Write one item to Firestore + localStorage ─────────────────────────────
 function saveItem(col: string, item: any, allItems: any[]) {
-  // Always save to localStorage first (instant, always works)
   lsSave(col, allItems);
-  // Then try Firestore in background
   try {
     const { id, ...data } = item;
     setDoc(doc(db, col, id), { ...data, _updatedAt: new Date().toISOString() }, { merge: true })
-      .catch(() => {}); // silently ignore if offline
-  } catch {}
+      .catch(() => {
+        enqueueRetry(col, item.id, data);
+        showSyncWarning();
+      });
+  } catch {
+    const { id, ...data } = item;
+    enqueueRetry(col, id, data);
+    showSyncWarning();
+  }
 }
 
 // ── Generic collection state — localStorage + Firestore ───────────────────
