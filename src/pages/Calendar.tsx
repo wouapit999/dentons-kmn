@@ -43,7 +43,7 @@ function AttendeeSelector({ selected, onChange, users, label }: { selected:strin
 
 export default function CalendarPage() {
   const { t, i18n } = useTranslation();
-  const { users } = useApp();
+  const { users, currentUser } = useApp();
   const isFr = i18n.language === "fr";
   const { calendarEvents, setCalendarEvents, matters } = useData();
 
@@ -59,6 +59,9 @@ export default function CalendarPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<CalendarEvent>>({ type:"meeting", attendees:[] });
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const [previewEvent, setPreviewEvent] = useState<CalendarEvent|null>(null);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent|null>(null);
+  const [dayEventsPopup, setDayEventsPopup] = useState<{day:number; events:CalendarEvent[]}|null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -82,12 +85,21 @@ export default function CalendarPage() {
 
   const handleSubmit = () => {
     if (!validate()) return;
-    setCalendarEvents(prev => [{
-      id:`ev${Date.now()}`, title:form.title!, type:(form.type||"meeting") as any,
-      startDate:form.startDate!, endDate:form.endDate||form.startDate!,
-      matterId:form.matterId, location:form.location, attendees:form.attendees||[],
-    }, ...prev]);
+    if (editingEvent) {
+      setCalendarEvents(prev => prev.map(ev => ev.id === editingEvent.id ? {
+        ...ev, title:form.title!, type:(form.type||"meeting") as any,
+        startDate:form.startDate!, endDate:form.endDate||form.startDate!,
+        matterId:form.matterId, location:form.location, attendees:form.attendees||[],
+      } : ev));
+    } else {
+      setCalendarEvents(prev => [{
+        id:`ev${Date.now()}`, title:form.title!, type:(form.type||"meeting") as any,
+        startDate:form.startDate!, endDate:form.endDate||form.startDate!,
+        matterId:form.matterId, location:form.location, attendees:form.attendees||[],
+      }, ...prev]);
+    }
     setShowModal(false);
+    setEditingEvent(null);
     setForm({ type:"meeting", attendees:[] });
     setErrors({});
   };
@@ -123,15 +135,18 @@ export default function CalendarPage() {
             const day = i+1;
             const dayEvents = getEventsForDay(day);
             return (
-              <div key={day} style={{ minHeight:90, borderRight:"1px solid var(--gray-100)", borderBottom:"1px solid var(--gray-100)", padding:"6px 8px", cursor:"pointer" }}
-                onClick={()=>{ const d=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; setForm(f=>({...f,startDate:`${d}T09:00:00`,endDate:`${d}T10:00:00`})); setShowModal(true); }}
+              <div key={day} style={{ minHeight:90, borderRight:"1px solid var(--gray-100)", borderBottom:"1px solid var(--gray-100)", padding:"6px 8px", cursor:"pointer", position:"relative" }}
+                onClick={()=>{
+                  if (dayEvents.length > 0) { setDayEventsPopup({day, events: dayEvents}); }
+                  else { const d=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; setForm(f=>({...f,startDate:`${d}T09:00:00`,endDate:`${d}T10:00:00`})); setShowModal(true); }
+                }}
               >
                 <div style={{ width:26, height:26, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:isToday(day)?700:400, background:isToday(day)?"var(--navy)":"transparent", color:isToday(day)?"white":"var(--gray-800)", marginBottom:4 }}>{day}</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
                   {dayEvents.slice(0,3).map(ev=>(
-                    <div key={ev.id} style={{ background:typeColor[ev.type]||"var(--gray-500)", color:"white", borderRadius:3, padding:"1px 5px", fontSize:11, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={ev.title}>{ev.title}</div>
+                    <div key={ev.id} onClick={e=>{e.stopPropagation();setPreviewEvent(ev);}} style={{ background:typeColor[ev.type]||"var(--gray-500)", color:"white", borderRadius:3, padding:"1px 5px", fontSize:11, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", cursor:"pointer" }} title={ev.title}>{ev.title}</div>
                   ))}
-                  {dayEvents.length>3&&<div style={{fontSize:10,color:"var(--gray-400)"}}>+{dayEvents.length-3}</div>}
+                  {dayEvents.length>3&&<div onClick={e=>{e.stopPropagation();setDayEventsPopup({day, events:dayEvents});}} style={{fontSize:10,color:"var(--gold-dark)",fontWeight:600,cursor:"pointer"}}>+{dayEvents.length-3} {isFr?"plus":"more"}</div>}
                 </div>
               </div>
             );
@@ -146,7 +161,8 @@ export default function CalendarPage() {
           {calendarEvents.length===0
             ? <div className="empty-state"><div className="empty-state-text">{t("common.noData")}</div></div>
             : [...calendarEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,8).map(ev=>(
-              <div key={ev.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 20px", borderBottom:"1px solid var(--gray-100)" }}>
+              <div key={ev.id} onClick={()=>setPreviewEvent(ev)} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 20px", borderBottom:"1px solid var(--gray-100)", cursor:"pointer", transition:"background 0.15s" }}
+                onMouseEnter={e=>(e.currentTarget.style.background="var(--gray-50)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                 <div style={{ width:4, height:40, borderRadius:2, background:typeColor[ev.type], flexShrink:0 }}/>
                 <div style={{ flexShrink:0, minWidth:46, textAlign:"center" }}>
                   <div style={{ fontSize:20, fontWeight:700, color:"var(--navy)" }}>{new Date(ev.startDate).getDate()}</div>
@@ -162,12 +178,132 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* ── Event Preview Modal ────────────────────────────────────── */}
+      {previewEvent && (()=>{
+        const ev = previewEvent;
+        const matter = matters.find(m=>m.id===ev.matterId);
+        const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
+        const start = new Date(ev.startDate);
+        const end = new Date(ev.endDate);
+        const color = typeColor[ev.type]||"var(--gray-500)";
+        return (
+          <div className="modal-overlay" onClick={()=>setPreviewEvent(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
+              <div style={{background:color,padding:"20px 24px",borderRadius:"var(--radius) var(--radius) 0 0",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.7)",marginBottom:4}}>{t(`calendar.eventTypes.${ev.type}`)}</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"white"}}>{ev.title}</div>
+                </div>
+                <button onClick={()=>setPreviewEvent(null)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"white",fontSize:18}}>×</button>
+              </div>
+              <div style={{padding:"20px 24px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"12px 16px",fontSize:14}}>
+                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Date":"Date"}</span>
+                  <span style={{fontWeight:500}}>{start.toLocaleDateString(isFr?"fr-FR":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</span>
+
+                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Heure":"Time"}</span>
+                  <span style={{fontWeight:500}}>{ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}</span>
+
+                  {ev.location && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Lieu":"Location"}</span>
+                    <span style={{fontWeight:500}}>{ev.location}</span>
+                  </>}
+
+                  {matter && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Dossier":"Matter"}</span>
+                    <span style={{fontWeight:500}}>{matter.matterId} — {matter.title}</span>
+                  </>}
+
+                  {attendeeUsers.length > 0 && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Participants":"Attendees"}</span>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {attendeeUsers.map(u=>(
+                        <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:600}}>
+                          {u.firstName} {u.lastName}
+                        </span>
+                      ))}
+                    </div>
+                  </>}
+                </div>
+              </div>
+              <div style={{padding:"12px 24px 20px",display:"flex",gap:10,justifyContent:"flex-end",borderTop:"1px solid var(--gray-100)"}}>
+                <button className="btn btn-outline" style={{color:"#C0392B",borderColor:"#C0392B"}} onClick={()=>{
+                  if(window.confirm(isFr?"Supprimer cet événement ?":"Delete this event?")) {
+                    setCalendarEvents(prev=>prev.filter(e=>e.id!==ev.id));
+                    setPreviewEvent(null);
+                  }
+                }}>{isFr?"Supprimer":"Delete"}</button>
+                <button className="btn btn-gold" onClick={()=>{
+                  setForm({...ev});
+                  setEditingEvent(ev);
+                  setPreviewEvent(null);
+                  setShowModal(true);
+                }}>{isFr?"Modifier":"Edit"}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Day Events List Popup ─────────────────────────────────── */}
+      {dayEventsPopup && (()=>{
+        const {day, events} = dayEventsPopup;
+        const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+        return (
+          <div className="modal-overlay" onClick={()=>setDayEventsPopup(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:480}}>
+              <div className="modal-header">
+                <span className="modal-title">{day} {MONTHS[month]} {year} — {events.length} {isFr?"événement(s)":"event(s)"}</span>
+                <button className="btn btn-ghost btn-icon" onClick={()=>setDayEventsPopup(null)}><X size={18}/></button>
+              </div>
+              <div style={{padding:"8px 0",maxHeight:400,overflowY:"auto"}}>
+                {events.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(ev=>{
+                  const color = typeColor[ev.type]||"var(--gray-500)";
+                  const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
+                  const matter = matters.find(m=>m.id===ev.matterId);
+                  return (
+                    <div key={ev.id} onClick={()=>{setDayEventsPopup(null);setPreviewEvent(ev);}} style={{display:"flex",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--gray-100)",cursor:"pointer",transition:"background 0.15s"}}
+                      onMouseEnter={e=>(e.currentTarget.style.background="var(--gray-50)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
+                      <div style={{width:4,borderRadius:2,background:color,flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:14,color:"var(--navy)",marginBottom:2}}>{ev.title}</div>
+                        <div style={{fontSize:12,color:"var(--gray-500)"}}>
+                          {ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}
+                          {ev.location&&` · ${ev.location}`}
+                        </div>
+                        {matter&&<div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>{matter.matterId} — {matter.title}</div>}
+                        {attendeeUsers.length>0&&(
+                          <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                            {attendeeUsers.map(u=>(
+                              <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:600}}>{u.firstName} {u.lastName?.[0]||""}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="badge" style={{background:color+"22",color,flexShrink:0,alignSelf:"center",fontSize:10}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{padding:"12px 20px",borderTop:"1px solid var(--gray-100)",display:"flex",justifyContent:"flex-end"}}>
+                <button className="btn btn-gold" onClick={()=>{
+                  setDayEventsPopup(null);
+                  setForm(f=>({...f,startDate:`${dateStr}T09:00:00`,endDate:`${dateStr}T10:00:00`}));
+                  setShowModal(true);
+                }}><Plus size={14}/>{isFr?"Ajouter un événement":"Add Event"}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── New / Edit Event Modal ─────────────────────────────────── */}
       {showModal && (
         <div className="modal-overlay" onClick={()=>setShowModal(false)}>
           <div className="modal" onClick={e=>e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">{t("calendar.newEvent")}</span>
-              <button className="btn btn-ghost btn-icon" onClick={()=>setShowModal(false)}><X size={18}/></button>
+              <span className="modal-title">{editingEvent ? (isFr?"Modifier l'événement":"Edit Event") : t("calendar.newEvent")}</span>
+              <button className="btn btn-ghost btn-icon" onClick={()=>{setShowModal(false);setEditingEvent(null);}}><X size={18}/></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -221,8 +357,8 @@ export default function CalendarPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-outline" onClick={()=>setShowModal(false)}>{t("common.cancel")}</button>
-              <button className="btn btn-gold" onClick={handleSubmit}><Plus size={15}/>{t("common.save")}</button>
+              <button className="btn btn-outline" onClick={()=>{setShowModal(false);setEditingEvent(null);}}>{t("common.cancel")}</button>
+              <button className="btn btn-gold" onClick={handleSubmit}><Plus size={15}/>{editingEvent?(isFr?"Enregistrer":"Save"):t("common.save")}</button>
             </div>
           </div>
         </div>
