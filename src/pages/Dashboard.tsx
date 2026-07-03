@@ -96,19 +96,48 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
 
         <div style={{display:"flex",flexDirection:"column",gap:20}}>
           <div className="card">
-            <div className="card-header"><span className="card-title">{t("dashboard.upcomingDeadlines")}</span></div>
-            <div className="card-body" style={{padding:"8px 20px"}}>
+            <div className="card-header">
+              <span className="card-title">{t("dashboard.upcomingDeadlines")}</span>
+              <button className="btn btn-ghost btn-sm" onClick={()=>onNavigate("calendar")}>{t("common.view")} →</button>
+            </div>
+            <div className="card-body" style={{padding:0}}>
               {upcomingEvents.length===0
                 ? <div style={{textAlign:"center",padding:"20px 0",color:"var(--gray-400)",fontSize:13}}>{t("common.noData")}</div>
-                : upcomingEvents.map(ev=>(
-                  <div key={ev.id} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
+                : upcomingEvents.map(ev=>{
+                  const matter = matters.find(m=>m.id===ev.matterId);
+                  const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
+                  const lawyers = matter?.team?.length ? matter.team.map(tm=>{const u=users.find(u=>u.id===tm.userId); return u?`${u.firstName} ${u.lastName}`:null;}).filter(Boolean) : [];
+                  const typeColors: Record<string,string> = { courtDate:"#C0392B", meeting:"#1D6FA4", deadline:"#B45309", hearing:"#6741D9", deposition:"#1A7F4B", reminder:"#868E96" };
+                  const color = typeColors[ev.type]||"var(--gray-500)";
+                  return (
+                  <div key={ev.id} onClick={()=>onNavigate("calendar")} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--gray-100)",cursor:"pointer",transition:"background 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="var(--gray-50)";}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    <div style={{width:4,minHeight:50,borderRadius:2,background:color,flexShrink:0}}/>
                     <div style={{background:"var(--gray-100)",borderRadius:8,padding:"6px 10px",textAlign:"center",flexShrink:0,minWidth:46}}>
-                      <div style={{fontSize:16,fontWeight:700,color:"var(--navy)"}}>{new Date(ev.startDate).getDate()}</div>
-                      <div style={{fontSize:10,color:"var(--gray-500)",textTransform:"uppercase"}}>{new Date(ev.startDate).toLocaleString(undefined,{month:"short"})}</div>
+                      <div style={{fontSize:18,fontWeight:700,color:"var(--navy)",lineHeight:1}}>{new Date(ev.startDate).getDate()}</div>
+                      <div style={{fontSize:10,color:"var(--gray-500)",textTransform:"uppercase",marginTop:2}}>{new Date(ev.startDate).toLocaleString(undefined,{month:"short"})}</div>
                     </div>
-                    <div><div style={{fontWeight:500,fontSize:13,color:"var(--gray-800)"}}>{ev.title}</div><div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>{t(`calendar.eventTypes.${ev.type}`)}{ev.location&&` · ${ev.location}`}</div></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13,color:"var(--navy)",marginBottom:2}}>{ev.title}</div>
+                      <div style={{fontSize:11,color:"var(--gray-500)",marginBottom:2}}>
+                        {t(`calendar.eventTypes.${ev.type}`)} · {ev.startDate.split("T")[1]?.slice(0,5)||"—"}
+                        {ev.location&&<span style={{fontWeight:500}}> · 📍 {ev.location}</span>}
+                      </div>
+                      {client && <div style={{fontSize:11,color:"var(--navy)",fontWeight:600}}>🏢 {client.name}</div>}
+                      {lawyers.length > 0 && (
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:2}}>
+                          <span style={{fontSize:10,color:"var(--gray-400)"}}>⚖️</span>
+                          {lawyers.map((name,i)=>(
+                            <span key={i} style={{background:"var(--gold-pale)",color:"var(--navy)",borderRadius:10,padding:"0px 8px",fontSize:10,fontWeight:600,border:"1px solid var(--gold)"}}>{name}</span>
+                          ))}
+                        </div>
+                      )}
+                      {matter?.court && <div style={{fontSize:10,color:"var(--gray-400)",marginTop:1}}>🏛️ {matter.court}</div>}
+                    </div>
+                    <span className="badge" style={{background:color+"22",color,flexShrink:0,fontSize:10}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
                   </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
 
