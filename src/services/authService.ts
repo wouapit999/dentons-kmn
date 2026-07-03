@@ -55,7 +55,7 @@ export function getLoginActivity(): LoginRecord[] {
   try { return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || "[]"); } catch { return []; }
 }
 
-// ── All 17 users (hardcoded fallback) ─────────────────────────────────────────
+// ── All 18 users (hardcoded fallback) ─────────────────────────────────────────
 export const INITIAL_USERS: Array<{
   id:string; firstName:string; lastName:string; email:string;
   role:UserRole; billingRate:number; department:string; password:string;
@@ -77,6 +77,7 @@ export const INITIAL_USERS: Array<{
   { id:"u15", firstName:"Christian",  lastName:"Ekwe",       email:"christian.ekwe@dentons.com",    role:"finance",         billingRate:0,     department:"Finance",     password:"9638692" },
   { id:"u16", firstName:"Bangoup",    lastName:"Loic",       email:"loic.bangoup@dentons.com",      role:"associate",       billingRate:40000, department:"Employment",  password:"4505232" },
   { id:"u17", firstName:"Roland",     lastName:"Wouapit",    email:"roland.wouapit@dentons.com",    role:"admin",           billingRate:0,     department:"IT",          password:"4133648" },
+  { id:"u18", firstName:"Ornela",    lastName:"KEKE",       email:"ornela.keke@dentons.com",       role:"associate",       billingRate:40000, department:"Corporate",   password:"5827341" },
 ];
 
 // ── LOGIN — 3-layer password check ────────────────────────────────────────────
