@@ -213,28 +213,34 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Upcoming events */}
+      {/* Upcoming events — all events sorted by date, clickable for full preview */}
       <div className="card" style={{marginTop:20}}>
-        <div className="card-header"><span className="card-title">{t("dashboard.upcomingDeadlines")}</span></div>
+        <div className="card-header"><span className="card-title">{isFr?"Tous les Événements":"All Events"} ({filteredEvents.length})</span></div>
         <div className="card-body" style={{padding:0}}>
           {filteredEvents.length===0
             ? <div className="empty-state"><div className="empty-state-text">{t("common.noData")}</div></div>
-            : [...filteredEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).filter(ev=>ev.startDate>=now.toISOString().slice(0,10)).slice(0,12).map(ev=>{
+            : [...filteredEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(ev=>{
               const matter = matters.find(m=>m.id===ev.matterId);
               const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
               const lawyers = matter?.team?.length ? matter.team.map(tm=>{const u=users.find(u=>u.id===tm.userId); return u?`${u.firstName} ${u.lastName}`:null;}).filter(Boolean) : [];
+              const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
+              const isPast = ev.startDate < now.toISOString().slice(0,10);
               return (
-              <div key={ev.id} onClick={()=>setPreviewEvent(ev)} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 20px", borderBottom:"1px solid var(--gray-100)", cursor:"pointer", transition:"background 0.15s" }}
-                onMouseEnter={e=>(e.currentTarget.style.background="var(--gray-50)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                <div style={{ width:4, minHeight:54, borderRadius:2, background:typeColor[ev.type], flexShrink:0 }}/>
-                <div style={{ flexShrink:0, minWidth:46, textAlign:"center", paddingTop:2 }}>
+              <div key={ev.id} onClick={()=>setPreviewEvent(ev)} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 20px", borderBottom:"1px solid var(--gray-100)", cursor:"pointer", transition:"background 0.15s", opacity:isPast?0.6:1 }}
+                onMouseEnter={e=>{e.currentTarget.style.background="var(--gray-50)";}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                <div style={{ width:4, minHeight:60, borderRadius:2, background:typeColor[ev.type], flexShrink:0 }}/>
+                <div style={{ flexShrink:0, minWidth:50, textAlign:"center", paddingTop:2 }}>
                   <div style={{ fontSize:22, fontWeight:700, color:"var(--navy)", lineHeight:1 }}>{new Date(ev.startDate).getDate()}</div>
                   <div style={{ fontSize:10, textTransform:"uppercase", color:"var(--gray-400)", marginTop:2 }}>{MONTHS[new Date(ev.startDate).getMonth()]?.slice(0,3)}</div>
+                  <div style={{ fontSize:9, color:"var(--gray-300)", marginTop:1 }}>{new Date(ev.startDate).getFullYear()}</div>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14,color:"var(--navy)",marginBottom:3}}>{ev.title}</div>
+                  <div style={{fontWeight:700,fontSize:14,color:"var(--navy)",marginBottom:3,display:"flex",alignItems:"center",gap:6}}>
+                    {ev.title}
+                    {isPast && <span style={{fontSize:9,background:"var(--gray-200)",color:"var(--gray-500)",borderRadius:8,padding:"1px 6px"}}>{isFr?"Passé":"Past"}</span>}
+                  </div>
                   <div style={{fontSize:12,color:"var(--gray-500)",marginBottom:3}}>
-                    {t(`calendar.eventTypes.${ev.type}`)} · {ev.startDate.split("T")[1]?.slice(0,5)||"—"}
+                    {t(`calendar.eventTypes.${ev.type}`)} · {ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate?.split("T")[1]?.slice(0,5)||"—"}
                     {ev.location&&<span style={{fontWeight:500}}> · 📍 {ev.location}</span>}
                   </div>
                   {client && (
@@ -243,7 +249,7 @@ export default function CalendarPage() {
                     </div>
                   )}
                   {lawyers.length > 0 && (
-                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:2}}>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:2,alignItems:"center"}}>
                       <span style={{fontSize:11,color:"var(--gray-400)",lineHeight:"20px"}}>⚖️ {isFr?"Avocat(s)":"Lawyer(s)"}:</span>
                       {lawyers.map((name,i)=>(
                         <span key={i} style={{background:"var(--gold-pale)",color:"var(--navy)",borderRadius:12,padding:"1px 10px",fontSize:11,fontWeight:600,border:"1px solid var(--gold)"}}>{name}</span>
@@ -251,12 +257,21 @@ export default function CalendarPage() {
                     </div>
                   )}
                   {matter?.court && (
-                    <div style={{fontSize:11,color:"var(--gray-400)"}}>🏛️ {matter.court}</div>
+                    <div style={{fontSize:11,color:"var(--gray-400)",marginBottom:2}}>🏛️ {matter.court}</div>
+                  )}
+                  {attendeeUsers.length > 0 && (
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                      <span style={{fontSize:10,color:"var(--gray-400)"}}>👥</span>
+                      {attendeeUsers.map(u=>(
+                        <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:12,padding:"1px 8px",fontSize:10,fontWeight:600}}>{u.firstName} {u.lastName?.[0]||""}</span>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
                   <span className="badge" style={{background:typeColor[ev.type]+"22",color:typeColor[ev.type]}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
                   {canEditEvent(ev) ? <Edit2 size={12} color="var(--gold)"/> : <Eye size={12} color="var(--gray-400)"/>}
+                  <span style={{fontSize:10,color:"var(--gold-dark)",fontWeight:600,cursor:"pointer"}}>{isFr?"Voir détails →":"View details →"}</span>
                 </div>
               </div>
               );
