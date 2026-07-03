@@ -285,6 +285,7 @@ export interface CalendarEvent {
   location?: string;
   attendees: string[];
   description?: string;
+  createdBy?: string;
 }
 
 export interface Notification {

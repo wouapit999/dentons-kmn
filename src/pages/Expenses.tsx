@@ -37,7 +37,7 @@ export default function Expenses() {
   const { expenses, setExpenses, matters, clients } = useData();
   const isFr = i18n.language === "fr";
 
-  const role         = session?.role || "";
+  const role         = currentUser?.role || session?.role || "";
   const canApprove   = ["admin","finance","managingPartner"].includes(role);
   const myUserId     = currentUser?.id || session?.userId || "";
 
