@@ -44,7 +44,7 @@ export default function CalendarPage() {
   const { t, i18n } = useTranslation();
   const { users, currentUser, session } = useApp();
   const isFr = i18n.language === "fr";
-  const { calendarEvents, setCalendarEvents, matters } = useData();
+  const { calendarEvents, setCalendarEvents, matters, clients } = useData();
 
   const MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
@@ -219,7 +219,10 @@ export default function CalendarPage() {
         <div className="card-body" style={{padding:0}}>
           {filteredEvents.length===0
             ? <div className="empty-state"><div className="empty-state-text">{t("common.noData")}</div></div>
-            : [...filteredEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).filter(ev=>ev.startDate>=now.toISOString().slice(0,10)).slice(0,12).map(ev=>(
+            : [...filteredEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).filter(ev=>ev.startDate>=now.toISOString().slice(0,10)).slice(0,12).map(ev=>{
+              const matter = matters.find(m=>m.id===ev.matterId);
+              const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
+              return (
               <div key={ev.id} onClick={()=>setPreviewEvent(ev)} style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 20px", borderBottom:"1px solid var(--gray-100)", cursor:"pointer", transition:"background 0.15s" }}
                 onMouseEnter={e=>(e.currentTarget.style.background="var(--gray-50)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
                 <div style={{ width:4, height:40, borderRadius:2, background:typeColor[ev.type], flexShrink:0 }}/>
@@ -230,8 +233,12 @@ export default function CalendarPage() {
                 <div style={{flex:1}}>
                   <div style={{fontWeight:600,fontSize:13}}>{ev.title}</div>
                   <div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>
-                    {t(`calendar.eventTypes.${ev.type}`)}{ev.location&&` · ${ev.location}`} · {ev.startDate.split("T")[1]?.slice(0,5)}
-                    {ev.createdBy && <span style={{marginLeft:8,opacity:0.7}}>👤 {getUser(ev.createdBy)}</span>}
+                    {t(`calendar.eventTypes.${ev.type}`)}{ev.location&&` · 📍 ${ev.location}`} · {ev.startDate.split("T")[1]?.slice(0,5)}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--gray-400)",marginTop:1}}>
+                    {client && <span>🏢 {client.name} </span>}
+                    {matter?.court && <span>⚖️ {matter.court} </span>}
+                    {ev.createdBy && <span>👤 {getUser(ev.createdBy)}</span>}
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -239,7 +246,8 @@ export default function CalendarPage() {
                   <span className="badge" style={{background:typeColor[ev.type]+"22",color:typeColor[ev.type]}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
                 </div>
               </div>
-            ))}
+              );
+            })}
         </div>
       </div>
 
@@ -247,6 +255,11 @@ export default function CalendarPage() {
       {previewEvent && (()=>{
         const ev = previewEvent;
         const matter = matters.find(m=>m.id===ev.matterId);
+        const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
+        const teamLawyers = matter?.team?.length ? matter.team.map(tm => {
+          const u = users.find(u=>u.id===tm.userId);
+          return u ? { name:`${u.firstName} ${u.lastName}`, role:tm.role } : null;
+        }).filter(Boolean) as {name:string;role:string}[] : [];
         const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
         const start = new Date(ev.startDate);
         const color = typeColor[ev.type]||"var(--gray-500)";
@@ -254,7 +267,7 @@ export default function CalendarPage() {
         const creator = getUser(ev.createdBy);
         return (
           <div className="modal-overlay" onClick={()=>setPreviewEvent(null)}>
-            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:540}}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
               <div style={{background:color,padding:"20px 24px",borderRadius:"var(--radius) var(--radius) 0 0",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.7)",marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
@@ -267,20 +280,51 @@ export default function CalendarPage() {
               </div>
               <div style={{padding:"20px 24px"}}>
                 <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"12px 16px",fontSize:14}}>
-                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Date":"Date"}</span>
+                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Date d'audience":"Court Date"}</span>
                   <span style={{fontWeight:500}}>{start.toLocaleDateString(isFr?"fr-FR":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</span>
 
                   <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Heure":"Time"}</span>
                   <span style={{fontWeight:500}}>{ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}</span>
 
                   {ev.location && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Lieu":"Location"}</span>
-                    <span style={{fontWeight:500}}>{ev.location}</span>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Lieu / Tribunal":"Location / Court"}</span>
+                    <span style={{fontWeight:600,color:"var(--navy)"}}>{ev.location}</span>
                   </>}
 
                   {matter && <>
                     <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Dossier":"Matter"}</span>
                     <span style={{fontWeight:500}}>{matter.matterId} — {matter.title}</span>
+                  </>}
+
+                  {matter?.court && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Juridiction":"Court / Jurisdiction"}</span>
+                    <span style={{fontWeight:500}}>{matter.court}</span>
+                  </>}
+
+                  {matter?.judge && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Juge":"Judge"}</span>
+                    <span style={{fontWeight:500}}>{matter.judge}</span>
+                  </>}
+
+                  {client && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Client":"Client"}</span>
+                    <span style={{fontWeight:600,color:"var(--navy)"}}>{client.name}</span>
+                  </>}
+
+                  {teamLawyers.length > 0 && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Avocat(s) assigné(s)":"Assigned Lawyer(s)"}</span>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {teamLawyers.map((l,i)=>(
+                        <span key={i} style={{background:"var(--gold-pale)",color:"var(--navy)",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:600,border:"1px solid var(--gold)"}}>
+                          {l.name} <span style={{fontSize:10,opacity:0.7}}>({l.role})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </>}
+
+                  {matter?.opposingCounsel && <>
+                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Avocat adverse":"Opposing Counsel"}</span>
+                    <span style={{fontWeight:500}}>{matter.opposingCounsel}</span>
                   </>}
 
                   {attendeeUsers.length > 0 && <>
@@ -336,6 +380,7 @@ export default function CalendarPage() {
                   const color = typeColor[ev.type]||"var(--gray-500)";
                   const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
                   const matter = matters.find(m=>m.id===ev.matterId);
+                  const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
                   const editable = canEditEvent(ev);
                   return (
                     <div key={ev.id} onClick={()=>{setDayEventsPopup(null);setPreviewEvent(ev);}} style={{display:"flex",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--gray-100)",cursor:"pointer",transition:"background 0.15s"}}
@@ -348,9 +393,10 @@ export default function CalendarPage() {
                         </div>
                         <div style={{fontSize:12,color:"var(--gray-500)"}}>
                           {ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}
-                          {ev.location&&` · ${ev.location}`}
+                          {ev.location&&` · 📍 ${ev.location}`}
                         </div>
-                        {matter&&<div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>{matter.matterId} — {matter.title}</div>}
+                        {matter&&<div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>📁 {matter.matterId} — {matter.title}</div>}
+                        {client&&<div style={{fontSize:11,color:"var(--gray-400)"}}>🏢 {client.name}</div>}
                         <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
                           {ev.createdBy && <span style={{fontSize:10,color:"var(--gray-400)"}}>👤 {getUser(ev.createdBy)}</span>}
                           {attendeeUsers.length>0&&attendeeUsers.map(u=>(
