@@ -1,36 +1,41 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight, Plus, X, Users, Eye, Edit2, Trash2, Filter } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Plus, X, Users, Eye, Edit2, Trash2,
+  Calendar as CalIcon, List, LayoutGrid, MapPin, Clock, Briefcase,
+  User, Scale, Building2
+} from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { useData } from "../context/DataContext";
 import { CalendarEvent } from "../types";
 
+/* ── Attendee multi-select ─────────────────────────────────────────────── */
 function AttendeeSelector({ selected, onChange, users, label }: { selected:string[]; onChange:(ids:string[])=>void; users:any[]; label:string }) {
   const [open, setOpen] = useState(false);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(s=>s!==id) : [...selected,id]);
   const selectedUsers = users.filter(u => selected.includes(u.id));
   return (
     <div style={{ position:"relative" }}>
-      <div onClick={()=>setOpen(!open)} style={{ border:"1.5px solid var(--gray-300)", borderRadius:"var(--radius)", padding:"8px 12px", cursor:"pointer", background:"white", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", minHeight:40 }}>
+      <div onClick={()=>setOpen(!open)} style={{ border:"1.5px solid var(--gray-300)", borderRadius:6, padding:"8px 12px", cursor:"pointer", background:"white", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", minHeight:40 }}>
         {selectedUsers.length===0
-          ? <span style={{ color:"var(--gray-400)", fontSize:14 }}>— {label} —</span>
+          ? <span style={{ color:"var(--gray-400)", fontSize:13 }}>— {label} —</span>
           : selectedUsers.map(u=>(
-            <span key={u.id} style={{ background:"var(--navy)", color:"white", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:600, display:"inline-flex", alignItems:"center", gap:5 }}>
-              {u.firstName[0]}{u.lastName?.[0]||""} <span style={{opacity:0.7}}>{u.firstName}</span>
-              <button onClick={e=>{e.stopPropagation();toggle(u.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"white",padding:0,lineHeight:1}}>×</button>
+            <span key={u.id} style={{ background:"var(--navy)", color:"white", borderRadius:20, padding:"2px 10px", fontSize:11, fontWeight:600, display:"inline-flex", alignItems:"center", gap:4 }}>
+              {u.firstName} {u.lastName?.[0]||""}
+              <button onClick={e=>{e.stopPropagation();toggle(u.id);}} style={{background:"none",border:"none",cursor:"pointer",color:"white",padding:0,lineHeight:1,fontSize:13}}>×</button>
             </span>
           ))}
-        <span style={{marginLeft:"auto",color:"var(--gray-400)",fontSize:12}}>▾</span>
+        <span style={{marginLeft:"auto",color:"var(--gray-400)",fontSize:11}}>▾</span>
       </div>
       {open && (
-        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"white", border:"1px solid var(--gray-200)", borderRadius:"var(--radius)", boxShadow:"var(--shadow-md)", zIndex:200, maxHeight:200, overflowY:"auto" }}>
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"white", border:"1px solid var(--gray-200)", borderRadius:6, boxShadow:"0 8px 24px rgba(0,0,0,0.12)", zIndex:200, maxHeight:200, overflowY:"auto" }}>
           {users.filter(u=>u.active&&u.role!=="client").map(u=>(
-            <div key={u.id} onClick={()=>toggle(u.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", cursor:"pointer", background:selected.includes(u.id)?"var(--gold-pale)":"white", borderBottom:"1px solid var(--gray-100)" }}>
-              <div style={{ width:28,height:28,borderRadius:"50%",background:selected.includes(u.id)?"var(--gold)":"var(--navy)",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0 }}>
+            <div key={u.id} onClick={()=>toggle(u.id)} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 14px", cursor:"pointer", background:selected.includes(u.id)?"#f0f4ff":"white", borderBottom:"1px solid var(--gray-50)" }}>
+              <div style={{ width:26,height:26,borderRadius:"50%",background:selected.includes(u.id)?"var(--gold)":"var(--navy)",color:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0 }}>
                 {u.firstName[0]}{u.lastName?.[0]||""}
               </div>
-              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,color:"var(--navy)"}}>{u.firstName} {u.lastName}</div><div style={{fontSize:11,color:"var(--gray-500)"}}>{u.role}</div></div>
-              {selected.includes(u.id)&&<span style={{color:"var(--gold-dark)",fontWeight:700}}>✓</span>}
+              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:500,color:"var(--navy)"}}>{u.firstName} {u.lastName}</div></div>
+              {selected.includes(u.id)&&<span style={{color:"var(--gold-dark)",fontWeight:700,fontSize:14}}>✓</span>}
             </div>
           ))}
         </div>
@@ -40,6 +45,18 @@ function AttendeeSelector({ selected, onChange, users, label }: { selected:strin
   );
 }
 
+/* ── Type colors ───────────────────────────────────────────────────────── */
+const TYPE_COLOR: Record<string,{bg:string;fg:string;border:string}> = {
+  courtDate:   { bg:"#FEF2F2", fg:"#991B1B", border:"#C0392B" },
+  meeting:     { bg:"#EFF6FF", fg:"#1E40AF", border:"#1D6FA4" },
+  deadline:    { bg:"#FFFBEB", fg:"#92400E", border:"#B45309" },
+  hearing:     { bg:"#F5F3FF", fg:"#5B21B6", border:"#6741D9" },
+  deposition:  { bg:"#ECFDF5", fg:"#065F46", border:"#1A7F4B" },
+  reminder:    { bg:"#F9FAFB", fg:"#4B5563", border:"#868E96" },
+};
+const getTypeStyle = (type: string) => TYPE_COLOR[type] || TYPE_COLOR.reminder;
+
+/* ── Main Component ────────────────────────────────────────────────────── */
 export default function CalendarPage() {
   const { t, i18n } = useTranslation();
   const { users, currentUser, session } = useApp();
@@ -50,62 +67,61 @@ export default function CalendarPage() {
   const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
   const DAYS_EN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const DAYS_FR = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+  const DAYS_FULL_EN = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const DAYS_FULL_FR = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
   const MONTHS = isFr ? MONTHS_FR : MONTHS_EN;
-  const DAYS   = isFr ? DAYS_FR   : DAYS_EN;
+  const DAYS = isFr ? DAYS_FR : DAYS_EN;
+  const DAYS_FULL = isFr ? DAYS_FULL_FR : DAYS_FULL_EN;
 
   const myUserId = currentUser?.id || session?.userId || "";
-  const myRole   = currentUser?.role || session?.role || "";
-  const isAdmin  = myRole === "admin";
+  const myRole = currentUser?.role || session?.role || "";
+  const isAdmin = myRole === "admin";
 
   const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   const [currentDate, setCurrentDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
+  const [view, setView] = useState<"month"|"agenda">("month");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<CalendarEvent>>({ type:"meeting", attendees:[] });
   const [errors, setErrors] = useState<Record<string,string>>({});
-  const [previewEvent, setPreviewEvent] = useState<CalendarEvent|null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent|null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent|null>(null);
-  const [dayEventsPopup, setDayEventsPopup] = useState<{day:number; events:CalendarEvent[]}|null>(null);
-  const [viewFilter, setViewFilter] = useState<"all"|"mine">("all");
+  const [selectedDay, setSelectedDay] = useState<string|null>(todayStr);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month+1, 0).getDate();
 
-  const canEditEvent = (ev: CalendarEvent) => {
-    if (isAdmin) return true;
-    if (ev.createdBy === myUserId) return true;
-    if (!ev.createdBy && (ev.attendees||[]).includes(myUserId)) return true;
-    return false;
-  };
+  const canEditEvent = (ev: CalendarEvent) => isAdmin || ev.createdBy === myUserId || (!ev.createdBy && (ev.attendees||[]).includes(myUserId));
+  const getUser = (id?: string) => { if (!id) return isFr?"Inconnu":"Unknown"; const u=users.find(u=>u.id===id); return u?`${u.firstName} ${u.lastName}`:id; };
 
-  const getUser = (id?: string) => {
-    if (!id) return isFr ? "Inconnu" : "Unknown";
-    const u = users.find(u => u.id === id);
-    return u ? `${u.firstName} ${u.lastName}` : id;
-  };
-
-  const filteredEvents = useMemo(() => {
-    if (viewFilter === "mine") {
-      return calendarEvents.filter(ev =>
-        ev.createdBy === myUserId || (ev.attendees||[]).includes(myUserId)
-      );
-    }
-    return calendarEvents;
-  }, [calendarEvents, viewFilter, myUserId]);
-
-  const getEventsForDay = (day: number) => {
-    const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    return filteredEvents.filter(ev => ev.startDate.startsWith(dateStr));
-  };
-
-  const typeColor: Record<string,string> = { courtDate:"#C0392B", meeting:"#1D6FA4", deadline:"#B45309", hearing:"#6741D9", deposition:"#1A7F4B", reminder:"#868E96" };
+  const getEventsForDay = (dateStr: string) => calendarEvents.filter(ev => ev.startDate.startsWith(dateStr));
   const isToday = (day: number) => now.getFullYear()===year && now.getMonth()===month && now.getDate()===day;
+
+  const selectedDayEvents = useMemo(() => {
+    if (!selectedDay) return [];
+    return calendarEvents.filter(ev => ev.startDate.startsWith(selectedDay)).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  }, [calendarEvents, selectedDay]);
+
+  const agendaEvents = useMemo(() => {
+    return [...calendarEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  }, [calendarEvents]);
+
+  const agendaGrouped = useMemo(() => {
+    const groups: Record<string, CalendarEvent[]> = {};
+    agendaEvents.forEach(ev => {
+      const day = ev.startDate.split("T")[0];
+      if (!groups[day]) groups[day] = [];
+      groups[day].push(ev);
+    });
+    return Object.entries(groups).sort(([a],[b])=>a.localeCompare(b));
+  }, [agendaEvents]);
 
   const validate = () => {
     const e: Record<string,string> = {};
-    if (!form.title?.trim()) e.title = t("errors.required");
-    if (!form.startDate) e.startDate = t("errors.required");
+    if (!form.title?.trim()) e.title = isFr?"Titre requis":"Title required";
+    if (!form.startDate) e.startDate = isFr?"Date requise":"Date required";
     setErrors(e); return Object.keys(e).length===0;
   };
 
@@ -125,396 +141,375 @@ export default function CalendarPage() {
         createdBy: myUserId,
       }, ...prev]);
     }
-    setShowModal(false);
-    setEditingEvent(null);
-    setForm({ type:"meeting", attendees:[] });
-    setErrors({});
+    setShowModal(false); setEditingEvent(null);
+    setForm({ type:"meeting", attendees:[] }); setErrors({});
   };
 
   const deleteEvent = (ev: CalendarEvent) => {
     if (window.confirm(isFr?"Supprimer cet événement ?":"Delete this event?")) {
       setCalendarEvents(prev => prev.filter(e => e.id !== ev.id));
-      setPreviewEvent(null);
+      setSelectedEvent(null);
     }
   };
 
+  const openNewEvent = (dateStr?: string) => {
+    const d = dateStr || todayStr;
+    setForm({ type:"courtDate", attendees:[], startDate:`${d}T09:00:00`, endDate:`${d}T10:00:00` });
+    setEditingEvent(null); setErrors({}); setShowModal(true);
+  };
+
+  /* ── Event detail card (used in side panel and agenda) ──────────────── */
+  const EventCard = ({ ev, compact=false }: { ev: CalendarEvent; compact?: boolean }) => {
+    const matter = matters.find(m=>m.id===ev.matterId);
+    const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
+    const lawyers = matter?.team?.length ? matter.team.map(tm=>{const u=users.find(u=>u.id===tm.userId); return u?{name:`${u.firstName} ${u.lastName}`,role:tm.role}:null;}).filter(Boolean) as {name:string;role:string}[] : [];
+    const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
+    const ts = getTypeStyle(ev.type);
+    const editable = canEditEvent(ev);
+    const isSelected = selectedEvent?.id === ev.id;
+
+    return (
+      <div
+        onClick={()=>setSelectedEvent(isSelected?null:ev)}
+        style={{
+          background: isSelected ? ts.bg : "white",
+          border: `1px solid ${isSelected ? ts.border : "var(--gray-150, #e5e7eb)"}`,
+          borderLeft: `4px solid ${ts.border}`,
+          borderRadius: 8, padding: compact ? "10px 14px" : "14px 18px",
+          cursor:"pointer", transition:"all 0.15s",
+          boxShadow: isSelected ? `0 2px 8px ${ts.border}22` : "0 1px 3px rgba(0,0,0,0.04)",
+          marginBottom: 8,
+        }}
+        onMouseEnter={e=>{if(!isSelected)e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.08)";}}
+        onMouseLeave={e=>{if(!isSelected)e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)";}}
+      >
+        {/* Header row */}
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:isSelected?10:4}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:compact?13:15,color:"var(--navy)",lineHeight:1.3}}>{ev.title}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}>
+              <span style={{background:ts.bg,color:ts.fg,border:`1px solid ${ts.border}33`,borderRadius:4,padding:"1px 8px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.03em"}}>
+                {t(`calendar.eventTypes.${ev.type}`)}
+              </span>
+              <span style={{fontSize:11,color:"var(--gray-500)",display:"flex",alignItems:"center",gap:3}}>
+                <Clock size={10}/>{ev.startDate.split("T")[1]?.slice(0,5)||"—"} – {ev.endDate?.split("T")[1]?.slice(0,5)||"—"}
+              </span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:4,flexShrink:0}}>
+            {editable ? <Edit2 size={11} color="var(--gold)"/> : <Eye size={11} color="var(--gray-300)"/>}
+          </div>
+        </div>
+
+        {/* Details — always visible */}
+        <div style={{display:"grid",gap:5,marginTop:6}}>
+          {ev.location && (
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--gray-600)"}}>
+              <MapPin size={12} color={ts.border} style={{flexShrink:0}}/> <span style={{fontWeight:500}}>{ev.location}</span>
+            </div>
+          )}
+          {client && (
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--navy)"}}>
+              <Building2 size={12} color="var(--navy)" style={{flexShrink:0}}/> <span style={{fontWeight:600}}>{client.name}</span>
+            </div>
+          )}
+          {lawyers.length > 0 && (
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+              <Scale size={12} color="var(--gold-dark)" style={{flexShrink:0}}/>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {lawyers.map((l,i)=>(
+                  <span key={i} style={{background:"var(--gold-pale,#fef9eb)",color:"var(--navy)",borderRadius:4,padding:"1px 8px",fontSize:11,fontWeight:600,border:"1px solid var(--gold,#C9A84C)"}}>
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {matter && (
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--gray-500)"}}>
+              <Briefcase size={11} style={{flexShrink:0}}/> {matter.matterId} — {matter.title}
+            </div>
+          )}
+        </div>
+
+        {/* Expanded details when selected */}
+        {isSelected && (
+          <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${ts.border}22`}}>
+            <div style={{display:"grid",gap:6}}>
+              {matter?.court && (
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--gray-600)"}}>
+                  <span style={{fontWeight:600,color:"var(--gray-400)",fontSize:10,textTransform:"uppercase",minWidth:80}}>{isFr?"Tribunal":"Court"}</span>
+                  {matter.court}
+                </div>
+              )}
+              {matter?.judge && (
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--gray-600)"}}>
+                  <span style={{fontWeight:600,color:"var(--gray-400)",fontSize:10,textTransform:"uppercase",minWidth:80}}>{isFr?"Juge":"Judge"}</span>
+                  {matter.judge}
+                </div>
+              )}
+              {matter?.opposingCounsel && (
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--gray-600)"}}>
+                  <span style={{fontWeight:600,color:"var(--gray-400)",fontSize:10,textTransform:"uppercase",minWidth:80}}>{isFr?"Adverse":"Opposing"}</span>
+                  {matter.opposingCounsel}
+                </div>
+              )}
+              {attendeeUsers.length > 0 && (
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+                  <span style={{fontWeight:600,color:"var(--gray-400)",fontSize:10,textTransform:"uppercase",minWidth:80}}>{isFr?"Présents":"Attendees"}</span>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {attendeeUsers.map(u=>(
+                      <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:4,padding:"1px 8px",fontSize:11,fontWeight:500}}>{u.firstName} {u.lastName}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {ev.createdBy && (
+                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--gray-400)"}}>
+                  <User size={10}/> {isFr?"Créé par":"Created by"} {getUser(ev.createdBy)}
+                </div>
+              )}
+            </div>
+            {/* Action buttons */}
+            <div style={{display:"flex",gap:8,marginTop:12,justifyContent:"flex-end"}}>
+              {editable ? (
+                <>
+                  <button onClick={e=>{e.stopPropagation();deleteEvent(ev);}} style={{background:"none",border:"1px solid #ef4444",color:"#ef4444",borderRadius:6,padding:"5px 14px",fontSize:12,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    <Trash2 size={12}/>{isFr?"Supprimer":"Delete"}
+                  </button>
+                  <button onClick={e=>{e.stopPropagation();setForm({...ev});setEditingEvent(ev);setSelectedEvent(null);setShowModal(true);}} style={{background:"var(--navy)",border:"none",color:"white",borderRadius:6,padding:"5px 14px",fontSize:12,fontWeight:500,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                    <Edit2 size={12}/>{isFr?"Modifier":"Edit"}
+                  </button>
+                </>
+              ) : (
+                <span style={{fontSize:11,color:"var(--gray-400)",fontStyle:"italic"}}>{isFr?"Lecture seule — créé par":"View only — created by"} {getUser(ev.createdBy)}</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ── RENDER ──────────────────────────────────────────────────────────── */
   return (
     <div>
-      <div className="page-header">
-        <div><div className="page-header-title">{t("calendar.title")}</div>
-          <div className="page-header-subtitle">
-            {filteredEvents.length} {isFr?"événement(s)":"event(s)"}
-            {isAdmin && ` · ${isFr?"Vue administrateur — tous les événements":"Admin view — all events"}`}
-          </div>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+        <div>
+          <h1 style={{fontSize:22,fontWeight:700,color:"var(--navy)",margin:0,fontFamily:"Playfair Display,serif"}}>
+            {isFr?"Calendrier":"Calendar"}
+          </h1>
+          <p style={{fontSize:13,color:"var(--gray-500)",margin:"4px 0 0"}}>
+            {calendarEvents.length} {isFr?"événement(s)":"event(s)"} · {MONTHS[now.getMonth()]} {now.getFullYear()}
+          </p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <div style={{display:"flex",borderRadius:"var(--radius)",border:"1px solid var(--gray-200)",overflow:"hidden"}}>
-            <button onClick={()=>setViewFilter("all")} style={{padding:"6px 14px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:viewFilter==="all"?"var(--navy)":"white",color:viewFilter==="all"?"white":"var(--gray-600)"}}>
-              {isFr?"Tous":"All"}
+          {/* View toggle */}
+          <div style={{display:"flex",border:"1px solid var(--gray-200)",borderRadius:6,overflow:"hidden"}}>
+            <button onClick={()=>setView("month")} style={{padding:"6px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:view==="month"?"var(--navy)":"white",color:view==="month"?"white":"var(--gray-500)",display:"flex",alignItems:"center",gap:4}}>
+              <LayoutGrid size={13}/>{isFr?"Mois":"Month"}
             </button>
-            <button onClick={()=>setViewFilter("mine")} style={{padding:"6px 14px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:viewFilter==="mine"?"var(--navy)":"white",color:viewFilter==="mine"?"white":"var(--gray-600)",borderLeft:"1px solid var(--gray-200)"}}>
-              {isFr?"Mes événements":"My Events"}
+            <button onClick={()=>setView("agenda")} style={{padding:"6px 12px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:view==="agenda"?"var(--navy)":"white",color:view==="agenda"?"white":"var(--gray-500)",display:"flex",alignItems:"center",gap:4,borderLeft:"1px solid var(--gray-200)"}}>
+              <List size={13}/>{isFr?"Agenda":"Agenda"}
             </button>
           </div>
-          <button className="btn btn-gold" onClick={()=>{setEditingEvent(null);setForm({type:"meeting",attendees:[]});setShowModal(true);}}><Plus size={15}/>{t("calendar.newEvent")}</button>
+          <button onClick={()=>openNewEvent()} style={{background:"var(--gold,#C9A84C)",color:"white",border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+            <Plus size={15}/>{isFr?"Nouvel Événement":"New Event"}
+          </button>
         </div>
       </div>
 
-      {/* Legend */}
-      <div style={{ display:"flex", gap:16, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
-        {Object.entries(typeColor).map(([type,color])=>(
-          <div key={type} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"var(--gray-600)" }}>
-            <div style={{ width:10, height:10, borderRadius:2, background:color }}/>{t(`calendar.eventTypes.${type}`)}
+      {/* Type legend */}
+      <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        {Object.entries(TYPE_COLOR).map(([type,c])=>(
+          <div key={type} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:c.fg}}>
+            <div style={{width:8,height:8,borderRadius:2,background:c.border}}/>{t(`calendar.eventTypes.${type}`)}
           </div>
         ))}
-        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",fontSize:11,color:"var(--gray-400)"}}>
-          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><Edit2 size={10}/>{isFr?"Modifiable":"Editable"}</span>
-          <span style={{display:"inline-flex",alignItems:"center",gap:3}}><Eye size={10}/>{isFr?"Lecture seule":"View only"}</span>
-        </div>
       </div>
 
-      <div className="card">
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid var(--gray-100)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <button className="btn btn-ghost btn-icon" onClick={()=>setCurrentDate(new Date(year,month-1,1))}><ChevronLeft size={18}/></button>
-          <div style={{ fontWeight:700, fontSize:17, color:"var(--navy)", fontFamily:"Playfair Display, serif" }}>{MONTHS[month]} {year}</div>
-          <button className="btn btn-ghost btn-icon" onClick={()=>setCurrentDate(new Date(year,month+1,1))}><ChevronRight size={18}/></button>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom:"1px solid var(--gray-100)" }}>
-          {DAYS.map(d=><div key={d} style={{ padding:"10px 0", textAlign:"center", fontSize:11, fontWeight:700, color:"var(--gray-400)", textTransform:"uppercase", letterSpacing:"0.05em" }}>{d}</div>)}
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)" }}>
-          {Array.from({length:firstDay}).map((_,i)=><div key={`e${i}`} style={{ minHeight:90, borderRight:"1px solid var(--gray-100)", borderBottom:"1px solid var(--gray-100)", background:"var(--gray-50)" }}/>)}
-          {Array.from({length:daysInMonth}).map((_,i)=>{
-            const day = i+1;
-            const dayEvents = getEventsForDay(day);
-            return (
-              <div key={day} style={{ minHeight:90, borderRight:"1px solid var(--gray-100)", borderBottom:"1px solid var(--gray-100)", padding:"6px 8px", cursor:"pointer", position:"relative" }}
-                onClick={()=>{
-                  if (dayEvents.length > 0) { setDayEventsPopup({day, events: dayEvents}); }
-                  else { const d=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; setForm(f=>({...f,startDate:`${d}T09:00:00`,endDate:`${d}T10:00:00`,type:"meeting",attendees:[]})); setShowModal(true); }
-                }}
-              >
-                <div style={{ width:26, height:26, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:isToday(day)?700:400, background:isToday(day)?"var(--navy)":"transparent", color:isToday(day)?"white":"var(--gray-800)", marginBottom:4 }}>{day}</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-                  {dayEvents.slice(0,3).map(ev=>{
-                    const editable = canEditEvent(ev);
-                    return (
-                      <div key={ev.id} onClick={e=>{e.stopPropagation();setPreviewEvent(ev);}}
-                        style={{ background:typeColor[ev.type]||"var(--gray-500)", color:"white", borderRadius:3, padding:"1px 5px", fontSize:11, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", cursor:"pointer", opacity:editable?1:0.8, borderLeft:editable?"none":`2px solid rgba(255,255,255,0.5)` }}
-                        title={`${ev.title}${editable?"":" ("+( isFr?"lecture seule":"view only")+")"}`}
-                      >{ev.title}</div>
-                    );
-                  })}
-                  {dayEvents.length>3&&<div onClick={e=>{e.stopPropagation();setDayEventsPopup({day, events:dayEvents});}} style={{fontSize:10,color:"var(--gold-dark)",fontWeight:600,cursor:"pointer"}}>+{dayEvents.length-3} {isFr?"plus":"more"}</div>}
+      {view === "month" ? (
+        /* ════════════════ MONTH VIEW — Calendar + Side Panel ════════════ */
+        <div style={{display:"grid",gridTemplateColumns:"1fr 380px",gap:20,alignItems:"start"}}>
+          {/* Left: Calendar grid */}
+          <div style={{background:"white",borderRadius:10,border:"1px solid var(--gray-150,#e5e7eb)",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+            {/* Month nav */}
+            <div style={{padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid var(--gray-100)"}}>
+              <button onClick={()=>setCurrentDate(new Date(year,month-1,1))} style={{background:"none",border:"1px solid var(--gray-200)",borderRadius:6,padding:"6px 10px",cursor:"pointer",display:"flex"}}><ChevronLeft size={16} color="var(--gray-500)"/></button>
+              <span style={{fontWeight:700,fontSize:16,color:"var(--navy)",fontFamily:"Playfair Display,serif"}}>{MONTHS[month]} {year}</span>
+              <button onClick={()=>setCurrentDate(new Date(year,month+1,1))} style={{background:"none",border:"1px solid var(--gray-200)",borderRadius:6,padding:"6px 10px",cursor:"pointer",display:"flex"}}><ChevronRight size={16} color="var(--gray-500)"/></button>
+            </div>
+            {/* Day headers */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:"1px solid var(--gray-100)"}}>
+              {DAYS.map(d=><div key={d} style={{padding:"8px 0",textAlign:"center",fontSize:10,fontWeight:700,color:"var(--gray-400)",textTransform:"uppercase",letterSpacing:"0.08em"}}>{d}</div>)}
+            </div>
+            {/* Day cells */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
+              {Array.from({length:firstDay}).map((_,i)=><div key={`e${i}`} style={{minHeight:80,borderRight:"1px solid var(--gray-50)",borderBottom:"1px solid var(--gray-50)",background:"#fafafa"}}/>)}
+              {Array.from({length:daysInMonth}).map((_,i)=>{
+                const day = i+1;
+                const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+                const dayEvents = getEventsForDay(dateStr);
+                const isSel = selectedDay === dateStr;
+                const today = isToday(day);
+                return (
+                  <div key={day}
+                    onClick={()=>{setSelectedDay(dateStr);setSelectedEvent(null);}}
+                    style={{
+                      minHeight:80, borderRight:"1px solid var(--gray-50)", borderBottom:"1px solid var(--gray-50)",
+                      padding:"4px 6px", cursor:"pointer", transition:"background 0.1s",
+                      background: isSel ? "var(--navy)" : today ? "#f0f7ff" : "white",
+                    }}
+                  >
+                    <div style={{
+                      width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:12, fontWeight: today||isSel ? 700 : 400,
+                      color: isSel ? "white" : today ? "var(--navy)" : "var(--gray-700)",
+                      marginBottom:3,
+                    }}>{day}</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                      {dayEvents.slice(0,3).map(ev=>{
+                        const ts2 = getTypeStyle(ev.type);
+                        return (
+                          <div key={ev.id}
+                            onClick={e=>{e.stopPropagation();setSelectedDay(dateStr);setSelectedEvent(ev);}}
+                            style={{
+                              background: isSel ? "rgba(255,255,255,0.15)" : ts2.bg,
+                              color: isSel ? "white" : ts2.fg,
+                              borderLeft: `2px solid ${ts2.border}`,
+                              borderRadius:3, padding:"1px 5px", fontSize:10,
+                              whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                              fontWeight:500,
+                            }}
+                          >{ev.title}</div>
+                        );
+                      })}
+                      {dayEvents.length>3&&<div style={{fontSize:9,color:isSel?"rgba(255,255,255,0.7)":"var(--gray-400)",fontWeight:600,paddingLeft:4}}>+{dayEvents.length-3}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Side panel — day detail */}
+          <div style={{position:"sticky",top:20}}>
+            <div style={{background:"white",borderRadius:10,border:"1px solid var(--gray-150,#e5e7eb)",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+              <div style={{padding:"14px 18px",borderBottom:"1px solid var(--gray-100)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,color:"var(--navy)"}}>
+                    {selectedDay ? (()=>{const d=new Date(selectedDay+"T12:00:00"); return `${DAYS_FULL[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;})() : isFr?"Sélectionnez un jour":"Select a day"}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>{selectedDayEvents.length} {isFr?"événement(s)":"event(s)"}</div>
                 </div>
+                <button onClick={()=>openNewEvent(selectedDay||undefined)} style={{background:"var(--navy)",border:"none",color:"white",borderRadius:6,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                  <Plus size={14}/>
+                </button>
+              </div>
+              <div style={{padding:"12px 14px",maxHeight:"calc(100vh - 280px)",overflowY:"auto"}}>
+                {selectedDayEvents.length === 0 ? (
+                  <div style={{textAlign:"center",padding:"30px 10px",color:"var(--gray-400)"}}>
+                    <CalIcon size={32} style={{opacity:0.3,margin:"0 auto 8px",display:"block"}}/>
+                    <div style={{fontSize:13,fontWeight:500}}>{isFr?"Aucun événement":"No events"}</div>
+                    <div style={{fontSize:11,marginTop:4}}>{isFr?"Cliquez + pour ajouter":"Click + to add"}</div>
+                  </div>
+                ) : selectedDayEvents.map(ev => <EventCard key={ev.id} ev={ev}/>)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ════════════════ AGENDA VIEW ══════════════════════════════════ */
+        <div style={{maxWidth:800}}>
+          {agendaGrouped.length === 0 ? (
+            <div style={{background:"white",borderRadius:10,border:"1px solid var(--gray-150,#e5e7eb)",padding:40,textAlign:"center",color:"var(--gray-400)"}}>
+              <CalIcon size={40} style={{opacity:0.3,margin:"0 auto 12px",display:"block"}}/>
+              <div style={{fontSize:14,fontWeight:500}}>{isFr?"Aucun événement":"No events"}</div>
+            </div>
+          ) : agendaGrouped.map(([dateStr, events]) => {
+            const d = new Date(dateStr+"T12:00:00");
+            const isPast = dateStr < todayStr;
+            const isToday2 = dateStr === todayStr;
+            return (
+              <div key={dateStr} style={{marginBottom:24,opacity:isPast?0.6:1}}>
+                {/* Date header */}
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                  <div style={{
+                    background: isToday2 ? "var(--navy)" : "var(--gray-100)",
+                    color: isToday2 ? "white" : "var(--navy)",
+                    borderRadius:10, padding:"8px 14px", textAlign:"center", minWidth:56,
+                  }}>
+                    <div style={{fontSize:22,fontWeight:800,lineHeight:1}}>{d.getDate()}</div>
+                    <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:"0.05em",marginTop:2}}>{MONTHS[d.getMonth()]?.slice(0,3)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:600,color:"var(--navy)"}}>{DAYS_FULL[d.getDay()]}</div>
+                    <div style={{fontSize:11,color:"var(--gray-400)"}}>{events.length} {isFr?"événement(s)":"event(s)"}{isPast ? ` · ${isFr?"Passé":"Past"}` : isToday2 ? ` · ${isFr?"Aujourd'hui":"Today"}` : ""}</div>
+                  </div>
+                </div>
+                {/* Events for this day */}
+                {events.map(ev => <EventCard key={ev.id} ev={ev}/>)}
               </div>
             );
           })}
         </div>
-      </div>
+      )}
 
-      {/* Upcoming events — all events sorted by date, clickable for full preview */}
-      <div className="card" style={{marginTop:20}}>
-        <div className="card-header"><span className="card-title">{isFr?"Tous les Événements":"All Events"} ({filteredEvents.length})</span></div>
-        <div className="card-body" style={{padding:0}}>
-          {filteredEvents.length===0
-            ? <div className="empty-state"><div className="empty-state-text">{t("common.noData")}</div></div>
-            : [...filteredEvents].sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(ev=>{
-              const matter = matters.find(m=>m.id===ev.matterId);
-              const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
-              const lawyers = matter?.team?.length ? matter.team.map(tm=>{const u=users.find(u=>u.id===tm.userId); return u?`${u.firstName} ${u.lastName}`:null;}).filter(Boolean) : [];
-              const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
-              const isPast = ev.startDate < now.toISOString().slice(0,10);
-              return (
-              <div key={ev.id} onClick={()=>setPreviewEvent(ev)} style={{ display:"flex", alignItems:"flex-start", gap:14, padding:"14px 20px", borderBottom:"1px solid var(--gray-100)", cursor:"pointer", transition:"background 0.15s", opacity:isPast?0.6:1 }}
-                onMouseEnter={e=>{e.currentTarget.style.background="var(--gray-50)";}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
-                <div style={{ width:4, minHeight:60, borderRadius:2, background:typeColor[ev.type], flexShrink:0 }}/>
-                <div style={{ flexShrink:0, minWidth:50, textAlign:"center", paddingTop:2 }}>
-                  <div style={{ fontSize:22, fontWeight:700, color:"var(--navy)", lineHeight:1 }}>{new Date(ev.startDate).getDate()}</div>
-                  <div style={{ fontSize:10, textTransform:"uppercase", color:"var(--gray-400)", marginTop:2 }}>{MONTHS[new Date(ev.startDate).getMonth()]?.slice(0,3)}</div>
-                  <div style={{ fontSize:9, color:"var(--gray-300)", marginTop:1 }}>{new Date(ev.startDate).getFullYear()}</div>
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14,color:"var(--navy)",marginBottom:3,display:"flex",alignItems:"center",gap:6}}>
-                    {ev.title}
-                    {isPast && <span style={{fontSize:9,background:"var(--gray-200)",color:"var(--gray-500)",borderRadius:8,padding:"1px 6px"}}>{isFr?"Passé":"Past"}</span>}
-                  </div>
-                  <div style={{fontSize:12,color:"var(--gray-500)",marginBottom:3}}>
-                    {t(`calendar.eventTypes.${ev.type}`)} · {ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate?.split("T")[1]?.slice(0,5)||"—"}
-                    {ev.location&&<span style={{fontWeight:500}}> · 📍 {ev.location}</span>}
-                  </div>
-                  {client && (
-                    <div style={{fontSize:12,color:"var(--navy)",fontWeight:600,marginBottom:2}}>
-                      🏢 {isFr?"Client":"Client"}: {client.name}
-                    </div>
-                  )}
-                  {lawyers.length > 0 && (
-                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:2,alignItems:"center"}}>
-                      <span style={{fontSize:11,color:"var(--gray-400)",lineHeight:"20px"}}>⚖️ {isFr?"Avocat(s)":"Lawyer(s)"}:</span>
-                      {lawyers.map((name,i)=>(
-                        <span key={i} style={{background:"var(--gold-pale)",color:"var(--navy)",borderRadius:12,padding:"1px 10px",fontSize:11,fontWeight:600,border:"1px solid var(--gold)"}}>{name}</span>
-                      ))}
-                    </div>
-                  )}
-                  {matter?.court && (
-                    <div style={{fontSize:11,color:"var(--gray-400)",marginBottom:2}}>🏛️ {matter.court}</div>
-                  )}
-                  {attendeeUsers.length > 0 && (
-                    <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
-                      <span style={{fontSize:10,color:"var(--gray-400)"}}>👥</span>
-                      {attendeeUsers.map(u=>(
-                        <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:12,padding:"1px 8px",fontSize:10,fontWeight:600}}>{u.firstName} {u.lastName?.[0]||""}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
-                  <span className="badge" style={{background:typeColor[ev.type]+"22",color:typeColor[ev.type]}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
-                  {canEditEvent(ev) ? <Edit2 size={12} color="var(--gold)"/> : <Eye size={12} color="var(--gray-400)"/>}
-                  <span style={{fontSize:10,color:"var(--gold-dark)",fontWeight:600,cursor:"pointer"}}>{isFr?"Voir détails →":"View details →"}</span>
-                </div>
-              </div>
-              );
-            })}
-        </div>
-      </div>
-
-      {/* ── Event Preview Modal ────────────────────────────────────── */}
-      {previewEvent && (()=>{
-        const ev = previewEvent;
-        const matter = matters.find(m=>m.id===ev.matterId);
-        const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
-        const teamLawyers = matter?.team?.length ? matter.team.map(tm => {
-          const u = users.find(u=>u.id===tm.userId);
-          return u ? { name:`${u.firstName} ${u.lastName}`, role:tm.role } : null;
-        }).filter(Boolean) as {name:string;role:string}[] : [];
-        const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
-        const start = new Date(ev.startDate);
-        const color = typeColor[ev.type]||"var(--gray-500)";
-        const editable = canEditEvent(ev);
-        const creator = getUser(ev.createdBy);
-        return (
-          <div className="modal-overlay" onClick={()=>setPreviewEvent(null)}>
-            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
-              <div style={{background:color,padding:"20px 24px",borderRadius:"var(--radius) var(--radius) 0 0",display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",color:"rgba(255,255,255,0.7)",marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
-                    {t(`calendar.eventTypes.${ev.type}`)}
-                    {!editable && <span style={{background:"rgba(255,255,255,0.2)",padding:"1px 8px",borderRadius:10,fontSize:10}}>{isFr?"Lecture seule":"View only"}</span>}
-                  </div>
-                  <div style={{fontSize:20,fontWeight:700,color:"white"}}>{ev.title}</div>
-                </div>
-                <button onClick={()=>setPreviewEvent(null)} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"white",fontSize:18}}>×</button>
-              </div>
-              <div style={{padding:"20px 24px"}}>
-                <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"12px 16px",fontSize:14}}>
-                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Date d'audience":"Court Date"}</span>
-                  <span style={{fontWeight:500}}>{start.toLocaleDateString(isFr?"fr-FR":"en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</span>
-
-                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Heure":"Time"}</span>
-                  <span style={{fontWeight:500}}>{ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}</span>
-
-                  {ev.location && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Lieu / Tribunal":"Location / Court"}</span>
-                    <span style={{fontWeight:600,color:"var(--navy)"}}>{ev.location}</span>
-                  </>}
-
-                  {matter && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Dossier":"Matter"}</span>
-                    <span style={{fontWeight:500}}>{matter.matterId} — {matter.title}</span>
-                  </>}
-
-                  {matter?.court && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Juridiction":"Court / Jurisdiction"}</span>
-                    <span style={{fontWeight:500}}>{matter.court}</span>
-                  </>}
-
-                  {matter?.judge && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Juge":"Judge"}</span>
-                    <span style={{fontWeight:500}}>{matter.judge}</span>
-                  </>}
-
-                  {client && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Client":"Client"}</span>
-                    <span style={{fontWeight:600,color:"var(--navy)"}}>{client.name}</span>
-                  </>}
-
-                  {teamLawyers.length > 0 && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Avocat(s) assigné(s)":"Assigned Lawyer(s)"}</span>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {teamLawyers.map((l,i)=>(
-                        <span key={i} style={{background:"var(--gold-pale)",color:"var(--navy)",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:600,border:"1px solid var(--gold)"}}>
-                          {l.name} <span style={{fontSize:10,opacity:0.7}}>({l.role})</span>
-                        </span>
-                      ))}
-                    </div>
-                  </>}
-
-                  {matter?.opposingCounsel && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Avocat adverse":"Opposing Counsel"}</span>
-                    <span style={{fontWeight:500}}>{matter.opposingCounsel}</span>
-                  </>}
-
-                  {attendeeUsers.length > 0 && <>
-                    <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Participants":"Attendees"}</span>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                      {attendeeUsers.map(u=>(
-                        <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:20,padding:"3px 12px",fontSize:12,fontWeight:600}}>
-                          {u.firstName} {u.lastName}
-                        </span>
-                      ))}
-                    </div>
-                  </>}
-
-                  <span style={{color:"var(--gray-400)",fontWeight:600,fontSize:12,textTransform:"uppercase"}}>{isFr?"Créé par":"Created by"}</span>
-                  <span style={{fontWeight:500}}>{creator}</span>
-                </div>
-              </div>
-              <div style={{padding:"12px 24px 20px",display:"flex",gap:10,justifyContent:"flex-end",borderTop:"1px solid var(--gray-100)"}}>
-                {editable ? (
-                  <>
-                    <button className="btn btn-outline" style={{color:"#C0392B",borderColor:"#C0392B"}} onClick={()=>deleteEvent(ev)}>
-                      <Trash2 size={13}/> {isFr?"Supprimer":"Delete"}
-                    </button>
-                    <button className="btn btn-gold" onClick={()=>{
-                      setForm({...ev});
-                      setEditingEvent(ev);
-                      setPreviewEvent(null);
-                      setShowModal(true);
-                    }}><Edit2 size={13}/> {isFr?"Modifier":"Edit"}</button>
-                  </>
-                ) : (
-                  <button className="btn btn-outline" onClick={()=>setPreviewEvent(null)}>{isFr?"Fermer":"Close"}</button>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Day Events List Popup ─────────────────────────────────── */}
-      {dayEventsPopup && (()=>{
-        const {day, events} = dayEventsPopup;
-        const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-        return (
-          <div className="modal-overlay" onClick={()=>setDayEventsPopup(null)}>
-            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
-              <div className="modal-header">
-                <span className="modal-title">{day} {MONTHS[month]} {year} — {events.length} {isFr?"événement(s)":"event(s)"}</span>
-                <button className="btn btn-ghost btn-icon" onClick={()=>setDayEventsPopup(null)}><X size={18}/></button>
-              </div>
-              <div style={{padding:"8px 0",maxHeight:400,overflowY:"auto"}}>
-                {events.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(ev=>{
-                  const color = typeColor[ev.type]||"var(--gray-500)";
-                  const attendeeUsers = users.filter(u=>(ev.attendees||[]).includes(u.id));
-                  const matter = matters.find(m=>m.id===ev.matterId);
-                  const client = matter ? clients.find(c=>c.id===matter.clientId) : null;
-                  const editable = canEditEvent(ev);
-                  return (
-                    <div key={ev.id} onClick={()=>{setDayEventsPopup(null);setPreviewEvent(ev);}} style={{display:"flex",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--gray-100)",cursor:"pointer",transition:"background 0.15s"}}
-                      onMouseEnter={e=>(e.currentTarget.style.background="var(--gray-50)")} onMouseLeave={e=>(e.currentTarget.style.background="transparent")}>
-                      <div style={{width:4,borderRadius:2,background:color,flexShrink:0}}/>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,fontSize:14,color:"var(--navy)",marginBottom:2,display:"flex",alignItems:"center",gap:6}}>
-                          {ev.title}
-                          {editable ? <Edit2 size={10} color="var(--gold)"/> : <Eye size={10} color="var(--gray-400)"/>}
-                        </div>
-                        <div style={{fontSize:12,color:"var(--gray-500)"}}>
-                          {ev.startDate.split("T")[1]?.slice(0,5)||"—"} → {ev.endDate.split("T")[1]?.slice(0,5)||"—"}
-                          {ev.location&&` · 📍 ${ev.location}`}
-                        </div>
-                        {matter&&<div style={{fontSize:11,color:"var(--gray-400)",marginTop:2}}>📁 {matter.matterId} — {matter.title}</div>}
-                        {client&&<div style={{fontSize:11,color:"var(--gray-400)"}}>🏢 {client.name}</div>}
-                        <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                          {ev.createdBy && <span style={{fontSize:10,color:"var(--gray-400)"}}>👤 {getUser(ev.createdBy)}</span>}
-                          {attendeeUsers.length>0&&attendeeUsers.map(u=>(
-                            <span key={u.id} style={{background:"var(--navy)",color:"white",borderRadius:20,padding:"1px 8px",fontSize:10,fontWeight:600}}>{u.firstName} {u.lastName?.[0]||""}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <span className="badge" style={{background:color+"22",color,flexShrink:0,alignSelf:"center",fontSize:10}}>{t(`calendar.eventTypes.${ev.type}`)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{padding:"12px 20px",borderTop:"1px solid var(--gray-100)",display:"flex",justifyContent:"flex-end"}}>
-                <button className="btn btn-gold" onClick={()=>{
-                  setDayEventsPopup(null);
-                  setForm({startDate:`${dateStr}T09:00:00`,endDate:`${dateStr}T10:00:00`,type:"meeting",attendees:[]});
-                  setEditingEvent(null);
-                  setShowModal(true);
-                }}><Plus size={14}/>{isFr?"Ajouter un événement":"Add Event"}</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── New / Edit Event Modal ─────────────────────────────────── */}
+      {/* ── New / Edit Modal ───────────────────────────────────────────── */}
       {showModal && (
-        <div className="modal-overlay" onClick={()=>{setShowModal(false);setEditingEvent(null);}}>
-          <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div className="modal-header">
-              <span className="modal-title">{editingEvent ? (isFr?"Modifier l'événement":"Edit Event") : t("calendar.newEvent")}</span>
-              <button className="btn btn-ghost btn-icon" onClick={()=>{setShowModal(false);setEditingEvent(null);}}><X size={18}/></button>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setShowModal(false);setEditingEvent(null);}}>
+          <div style={{background:"white",borderRadius:12,width:"100%",maxWidth:560,maxHeight:"90vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"18px 24px",borderBottom:"1px solid var(--gray-100)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:16,fontWeight:700,color:"var(--navy)"}}>{editingEvent ? (isFr?"Modifier l'événement":"Edit Event") : (isFr?"Nouvel Événement":"New Event")}</span>
+              <button onClick={()=>{setShowModal(false);setEditingEvent(null);}} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><X size={18} color="var(--gray-400)"/></button>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label required">{t("calendar.event")}</label>
-                <input className="form-control" value={form.title||""} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder={t("calendar.event")}/>
-                {errors.title&&<div className="form-error">{errors.title}</div>}
+            <div style={{padding:"20px 24px",display:"grid",gap:16}}>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Titre":"Title"} *</label>
+                <input value={form.title||""} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder={isFr?"Ex: Audience TGI Wouri":"e.g. Court Hearing TGI Wouri"} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                {errors.title&&<div style={{color:"#ef4444",fontSize:11,marginTop:3}}>{errors.title}</div>}
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">{t("common.type")}</label>
-                  <select className="form-control" value={form.type||"meeting"} onChange={e=>setForm(f=>({...f,type:e.target.value as any}))}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Type":"Type"}</label>
+                  <select value={form.type||"courtDate"} onChange={e=>setForm(f=>({...f,type:e.target.value as any}))} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}>
                     {["courtDate","meeting","deadline","hearing","deposition","reminder"].map(t2=><option key={t2} value={t2}>{t(`calendar.eventTypes.${t2}`)}</option>)}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label required">{t("calendar.startTime")}</label>
-                  <input className="form-control" type="datetime-local" value={form.startDate?.slice(0,16)||""} onChange={e=>setForm(f=>({...f,startDate:e.target.value+":00"}))}/>
-                  {errors.startDate&&<div className="form-error">{errors.startDate}</div>}
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Lieu / Tribunal":"Location / Court"}</label>
+                  <input value={form.location||""} onChange={e=>setForm(f=>({...f,location:e.target.value}))} placeholder={isFr?"Ex: TGI Wouri":"e.g. TGI Wouri"} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">{isFr?"Fin":"End Time"}</label>
-                  <input className="form-control" type="datetime-local" value={form.endDate?.slice(0,16)||""} onChange={e=>setForm(f=>({...f,endDate:e.target.value+":00"}))}/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Début":"Start"} *</label>
+                  <input type="datetime-local" value={form.startDate?.slice(0,16)||""} onChange={e=>setForm(f=>({...f,startDate:e.target.value+":00"}))} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                  {errors.startDate&&<div style={{color:"#ef4444",fontSize:11,marginTop:3}}>{errors.startDate}</div>}
                 </div>
-                <div className="form-group">
-                  <label className="form-label">{t("calendar.location")}</label>
-                  <input className="form-control" value={form.location||""} onChange={e=>setForm(f=>({...f,location:e.target.value}))}/>
+                <div>
+                  <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Fin":"End"}</label>
+                  <input type="datetime-local" value={form.endDate?.slice(0,16)||""} onChange={e=>setForm(f=>({...f,endDate:e.target.value+":00"}))} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">{t("matters.matter")}</label>
-                <select className="form-control" value={form.matterId||""} onChange={e=>setForm(f=>({...f,matterId:e.target.value}))}>
-                  <option value="">— {t("matters.matter")} ({t("common.optional")}) —</option>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"block",marginBottom:4}}>{isFr?"Dossier":"Matter"}</label>
+                <select value={form.matterId||""} onChange={e=>setForm(f=>({...f,matterId:e.target.value}))} style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--gray-200)",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}>
+                  <option value="">— {isFr?"Sélectionner un dossier":"Select a matter"} —</option>
                   {matters.map(m=><option key={m.id} value={m.id}>{m.matterId} – {m.title}</option>)}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label" style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <Users size={13}/>{t("calendar.attendees")}
-                  <span style={{ fontSize:11, color:"var(--gray-400)", fontWeight:400 }}>— {isFr?"tous seront notifiés":"all will receive a reminder notification"}</span>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:"var(--gray-600)",display:"flex",alignItems:"center",gap:5,marginBottom:4}}>
+                  <Users size={12}/>{isFr?"Participants":"Attendees"}
                 </label>
-                <AttendeeSelector
-                  selected={form.attendees||[]}
-                  onChange={ids=>setForm(f=>({...f,attendees:ids}))}
-                  users={users.filter(u=>u.active)}
-                  label={t("calendar.attendees")}
-                />
-                {(form.attendees?.length||0)>0&&(
-                  <div className="form-hint" style={{color:"var(--info)"}}>
-                    ℹ️ {form.attendees!.length} {form.attendees!.length===1?(isFr?"personne":"person"):(isFr?"personnes":"people")} {isFr?"seront notifiées 10 min avant.":"will be notified 10 minutes before."}
-                  </div>
-                )}
+                <AttendeeSelector selected={form.attendees||[]} onChange={ids=>setForm(f=>({...f,attendees:ids}))} users={users.filter(u=>u.active)} label={isFr?"Participants":"Attendees"}/>
               </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={()=>{setShowModal(false);setEditingEvent(null);}}>{t("common.cancel")}</button>
-              <button className="btn btn-gold" onClick={handleSubmit}>{editingEvent?<><Edit2 size={14}/>{isFr?"Enregistrer":"Save"}</>:<><Plus size={15}/>{t("common.save")}</>}</button>
+            <div style={{padding:"14px 24px",borderTop:"1px solid var(--gray-100)",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>{setShowModal(false);setEditingEvent(null);}} style={{background:"none",border:"1px solid var(--gray-200)",borderRadius:6,padding:"8px 20px",fontSize:13,cursor:"pointer",color:"var(--gray-600)"}}>{isFr?"Annuler":"Cancel"}</button>
+              <button onClick={handleSubmit} style={{background:"var(--navy)",border:"none",color:"white",borderRadius:6,padding:"8px 20px",fontSize:13,fontWeight:600,cursor:"pointer"}}>{editingEvent?(isFr?"Enregistrer":"Save"):(isFr?"Créer":"Create")}</button>
             </div>
           </div>
         </div>
